@@ -251,7 +251,20 @@ serve((req) => {
   const url = new URL(req.url);
 
   if (req.method === "GET" && url.pathname === "/") {
-    return new Response("OK", { status: 200 });
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Deno Proxy</title>
+</head>
+<body>
+  <h1>Deno Proxy Server</h1>
+  <p>Server is running</p>
+</body>
+</html>`;
+    return new Response(html, {
+      status: 200,
+      headers: { "content-type": "text/html" }
+    });
   }
 
   if (req.method === "GET" && url.pathname === "/healthz") {
