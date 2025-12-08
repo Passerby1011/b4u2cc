@@ -9,6 +9,7 @@ export interface ProxyConfig {
   aggregationIntervalMs: number;
   maxRequestsPerMinute: number;
   tokenMultiplier: number;
+  autoPort: boolean;
 }
 
 // 解析 TOKEN_MULTIPLIER，兼容常见字符串形式：
@@ -55,7 +56,12 @@ export function loadConfig(): ProxyConfig {
     throw new Error("UPSTREAM_BASE_URL must be provided");
   }
 
-  const port = Number(Deno.env.get("PORT") ?? "3456");
+  // 检查是否启用自动端口配置
+  const autoPort = Deno.env.get("AUTO_PORT") === "true";
+  
+  // 如果启用自动端口，则使用 0 让系统自动分配端口
+  // 否则使用环境变量指定的端口或默认端口 3456
+  const port = autoPort ? 0 : Number(Deno.env.get("PORT") ?? "3456");
   const host = Deno.env.get("HOST") ?? "0.0.0.0";
   const upstreamApiKey = Deno.env.get("UPSTREAM_API_KEY");
   const upstreamModelOverride = Deno.env.get("UPSTREAM_MODEL");
@@ -77,5 +83,6 @@ export function loadConfig(): ProxyConfig {
     aggregationIntervalMs,
     maxRequestsPerMinute,
     tokenMultiplier,
+    autoPort,
   };
 }

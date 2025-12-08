@@ -277,4 +277,4 @@ serve((req) => {
   }
 
   return new Response("Not Found", { status: 404 });
-}, { hostname: config.host, port: config.port });
+}, config.autoPort ? undefined : { hostname: config.host, port: config.port });
