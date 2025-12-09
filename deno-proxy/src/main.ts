@@ -83,10 +83,19 @@ async function handleMessages(req: Request, requestId: string) {
       output_tokens: tokenCount.output_tokens,
     });
 
-    // 如果有工具，先生成统一的触发信号
-    const triggerSignal = (body.tools ?? []).length > 0 ? randomTriggerSignal() : undefined;
+    // 根据 thinking 配置与 tools 决定是否启用工具协议
+    // 需求：在 thinking 启用时，不做工具解析，只做 thinking 解析。
+    const thinkingEnabled = !!body.thinking && body.thinking.type === "enabled";
+    const hasTools = (body.tools ?? []).length > 0;
+    const enableToolsProtocol = hasTools && !thinkingEnabled;
+
+    // 只有在真正启用工具协议时才生成触发信号，否则禁用工具解析
+    const triggerSignal = enableToolsProtocol ? randomTriggerSignal() : undefined;
     const openaiBase = mapClaudeToOpenAI(body, config, triggerSignal);
-    const injected = injectPrompt(openaiBase, body.tools ?? [], triggerSignal);
+
+    // 在 thinking 模式下，即使传入了 tools，也不注入工具提示，这样上游不会被要求输出 <invoke>
+    const toolsForInjection = enableToolsProtocol ? (body.tools ?? []) : [];
+    const injected = injectPrompt(openaiBase, toolsForInjection, triggerSignal);
     const upstreamReq = { ...openaiBase, messages: injected.messages };
 
     await rateLimiter.acquire();

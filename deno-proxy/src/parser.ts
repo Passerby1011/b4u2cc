@@ -50,17 +50,20 @@ export class ToolifyParser {
   }
 
   feedChar(char: string) {
+    // 当 triggerSignal 未配置时，按照“无工具协议，仅解析 thinking”的模式工作
+    if (!this.triggerSignal) {
+      this.handleCharWithoutTrigger(char);
+      return;
+    }
+
+    // 以下为“启用工具协议”的模式，同时支持 thinking 与 <invoke> 解析
+
     // 首先检查是否进入或退出思考模式
     this.checkThinkingMode(char);
-    
+
     if (this.thinkingMode) {
       this.thinkingBuffer += char;
       this.tryEmitThinking();
-      return;
-    }
-    
-    if (!this.triggerSignal) {
-      this.events.push({ type: "text", content: char });
       return;
     }
 
@@ -237,7 +240,57 @@ export class ToolifyParser {
     this.captureBuffer = "";
     this.capturing = false;
   }
-  
+
+  /**
+   * 在未启用工具协议（无 triggerSignal）时的解析逻辑：
+   * - 只解析 <thinking>...</thinking>，并发出 thinking 事件；
+   * - 其余内容全部作为普通文本 text 事件；
+   * - 不进行任何 <invoke> / 工具调用解析。
+   */
+  private handleCharWithoutTrigger(char: string) {
+    if (this.thinkingMode) {
+      // 已处于思考模式：累积思考内容并检查结束标签
+      this.thinkingBuffer += char;
+      if (this.thinkingBuffer.endsWith(THINKING_END_TAG)) {
+        log("debug", "Exiting thinking mode (no-trigger)", {
+          thinkingContent: this.thinkingBuffer.slice(0, -THINKING_END_TAG.length),
+        });
+        let thinkingContent = this.thinkingBuffer.slice(0, -THINKING_END_TAG.length);
+        // 与启用工具时保持一致：去掉开头多余的 ">" 和空白
+        thinkingContent = thinkingContent.replace(/^\s*>\s*/, "");
+        if (thinkingContent) {
+          this.events.push({ type: "thinking", content: thinkingContent });
+        }
+        this.thinkingBuffer = "";
+        this.thinkingMode = false;
+      }
+      return;
+    }
+
+    // 未处于思考模式：累积到普通缓冲区，检测 <thinking> 起始标签
+    this.buffer += char;
+    if (this.buffer.endsWith(THINKING_START_TAG)) {
+      log("debug", "Entering thinking mode (no-trigger)", {
+        bufferBefore: this.buffer.slice(0, -THINKING_START_TAG.length),
+      });
+      const textPortion = this.buffer.slice(0, -THINKING_START_TAG.length);
+      if (textPortion) {
+        this.events.push({ type: "text", content: textPortion });
+      }
+      this.buffer = "";
+      this.thinkingMode = true;
+      this.thinkingBuffer = "";
+      return;
+    }
+
+    // 为了避免无限积累缓冲区，这里做一个简单的流式折中：
+    // 当缓冲区超出一定长度时，直接作为文本输出。
+    if (this.buffer.length >= 256) {
+      this.events.push({ type: "text", content: this.buffer });
+      this.buffer = "";
+    }
+  }
+
   private checkThinkingMode(char: string) {
     // 检查是否进入思考模式
     if (!this.thinkingMode) {
