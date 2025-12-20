@@ -23,6 +23,7 @@ interface StreamContext {
   thinkingBlockOpen: boolean;
   finished: boolean;
   totalOutputTokens: number;
+  hasToolCalls: boolean;
 }
 
 export class ClaudeStream {
@@ -39,6 +40,7 @@ export class ClaudeStream {
       thinkingBlockOpen: false,
       finished: false,
       totalOutputTokens: 0,
+      hasToolCalls: false,
     };
     // 对 tokenMultiplier 做防御性处理，避免后续出现 NaN/Infinity
     this.tokenMultiplier = Number.isFinite(config.tokenMultiplier) && config.tokenMultiplier > 0
@@ -185,6 +187,7 @@ export class ClaudeStream {
     await this.endTextBlock();
     const index = this.context.nextBlockIndex++;
     const toolId = generateToolId();
+    this.context.hasToolCalls = true;
     await this.writer.send({
       event: "content_block_start",
       data: {
@@ -231,12 +234,13 @@ export class ClaudeStream {
       ),
     );
     
+    const stopReason = this.context.hasToolCalls ? "tool_use" : "end_turn";
     await this.writer.send({
       event: "message_delta",
       data: {
         type: "message_delta",
         delta: {
-          stop_reason: "end_turn",
+          stop_reason: stopReason,
           stop_sequence: null,
         },
         usage: {
