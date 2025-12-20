@@ -72,6 +72,11 @@ export class ClaudeStream {
         },
       },
     }, true);
+    // 发送 ping 事件以保持连接（符合官方协议）
+    await this.writer.send({
+      event: "ping",
+      data: { type: "ping" },
+    }, true);
   }
 
   async handleEvents(events: ParserEvent[]) {
@@ -151,7 +156,7 @@ export class ClaudeStream {
         data: {
           type: "content_block_start",
           index,
-          content_block: { type: "thinking", thinking: "" },
+          content_block: { type: "thinking", thinking: "", signature: "" },
         },
       }, true);
     }
@@ -161,6 +166,15 @@ export class ClaudeStream {
     if (!this.context.thinkingBlockOpen) return;
     this.context.thinkingBlockOpen = false;
     const index = this.context.nextBlockIndex - 1;
+    // 发送 signature_delta 事件（签名为空字符串）
+    await this.writer.send({
+      event: "content_block_delta",
+      data: {
+        type: "content_block_delta",
+        index,
+        delta: { type: "signature_delta", signature: "" },
+      },
+    }, true);
     await this.writer.send({
       event: "content_block_stop",
       data: { type: "content_block_stop", index },
@@ -173,14 +187,22 @@ export class ClaudeStream {
     // 使用 tiktoken 精确计算 token，然后应用倍数
     const estimatedTokens = countTokensWithTiktoken(content, "cl100k_base");
     this.context.totalOutputTokens += estimatedTokens;
-    await this.writer.send({
-      event: "content_block_delta",
-      data: {
-        type: "content_block_delta",
-        index: this.context.nextBlockIndex - 1,
-        delta: { type: "thinking_delta", thinking: content },
-      },
-    }, false);
+    
+    // 将思考内容分割成小块以模拟流式
+    const chunkSize = 5; // 每个块大约5个字符
+    for (let i = 0; i < content.length; i += chunkSize) {
+      const chunk = content.slice(i, i + chunkSize);
+      await this.writer.send({
+        event: "content_block_delta",
+        data: {
+          type: "content_block_delta",
+          index: this.context.nextBlockIndex - 1,
+          delta: { type: "thinking_delta", thinking: chunk },
+        },
+      }, false);
+      // 添加微小延迟以模拟流式（可选）
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
   }
 
   private async emitToolCall(call: ParsedInvokeCall) {
@@ -198,14 +220,25 @@ export class ClaudeStream {
     }, true);
 
     const inputJson = JSON.stringify(call.arguments);
-    await this.writer.send({
-      event: "content_block_delta",
-      data: {
-        type: "content_block_delta",
-        index,
-        delta: { type: "input_json_delta", partial_json: inputJson },
-      },
-    }, true);
+    // 计算 token 并累加
+    const estimatedTokens = countTokensWithTiktoken(inputJson, "cl100k_base");
+    this.context.totalOutputTokens += estimatedTokens;
+    
+    // 将 JSON 分割成小块以模拟流式
+    const chunkSize = 5; // 每个块大约5个字符
+    for (let i = 0; i < inputJson.length; i += chunkSize) {
+      const chunk = inputJson.slice(i, i + chunkSize);
+      await this.writer.send({
+        event: "content_block_delta",
+        data: {
+          type: "content_block_delta",
+          index,
+          delta: { type: "input_json_delta", partial_json: chunk },
+        },
+      }, true);
+      // 添加微小延迟以模拟流式（可选）
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
 
     await this.writer.send({
       event: "content_block_stop",
