@@ -256,7 +256,7 @@ export class ToolifyParser {
     // 未开启思考解析时，简单地把所有内容当作文本处理
     if (!this.thinkingEnabled) {
       this.buffer += char;
-      if (this.buffer.length >= 256) {
+      if (this.buffer.length >= 32) {
         this.events.push({ type: "text", content: this.buffer });
         this.buffer = "";
       }
@@ -299,7 +299,7 @@ export class ToolifyParser {
 
     // 为了避免无限积累缓冲区，这里做一个简单的流式折中：
     // 当缓冲区超出一定长度时，直接作为文本输出。
-    if (this.buffer.length >= 256) {
+    if (this.buffer.length >= 32) {
       this.events.push({ type: "text", content: this.buffer });
       this.buffer = "";
     }
