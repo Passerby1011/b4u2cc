@@ -1,5 +1,11 @@
 /// <reference lib="deno.ns" />
 
+export interface ChannelConfig {
+  name: string; // 渠道名称，用于 channel+model 格式
+  baseUrl: string;
+  apiKey?: string;
+}
+
 export interface UpstreamConfig {
   baseUrl: string;
   apiKey?: string;
@@ -11,6 +17,7 @@ export interface ProxyConfig {
   port: number;
   host: string;
   upstreamConfigs: UpstreamConfig[];
+  channelConfigs: ChannelConfig[]; // 渠道配置，用于 channel+model 格式
   // 向后兼容的旧字段（如果未设置 upstreamConfigs 则使用）
   upstreamBaseUrl?: string;
   upstreamApiKey?: string;
@@ -21,6 +28,7 @@ export interface ProxyConfig {
   maxRequestsPerMinute: number;
   tokenMultiplier: number;
   autoPort: boolean;
+  passthroughApiKey: boolean; // 是否将客户端 API key 透传给上游
 }
 
 // 解析 TOKEN_MULTIPLIER，兼容常见字符串形式：
@@ -28,6 +36,27 @@ export interface ProxyConfig {
 // - "1.2x" / "x1.2"
 // - "120%" （表示 1.2）
 // - 带引号或空格的写法："'1.2'" / " 1.2 "
+function loadChannelConfigs(): ChannelConfig[] {
+  const configs: ChannelConfig[] = [];
+  let i = 1;
+  while (true) {
+    const name = Deno.env.get(`CHANNEL_${i}_NAME`);
+    const baseUrl = Deno.env.get(`CHANNEL_${i}_BASE_URL`);
+    const apiKey = Deno.env.get(`CHANNEL_${i}_API_KEY`);
+    if (!name || !baseUrl) {
+      // 如果缺少必要字段，停止搜索
+      break;
+    }
+    configs.push({
+      name,
+      baseUrl,
+      apiKey,
+    });
+    i++;
+  }
+  return configs;
+}
+
 function parseTokenMultiplier(raw: string | undefined): number {
   if (!raw) return 1.0;
 
@@ -99,6 +128,12 @@ export function loadConfig(): ProxyConfig {
   // 解析 tokenMultiplier，并对非法值进行兜底，避免出现 NaN/Infinity
   const tokenMultiplier = parseTokenMultiplier(Deno.env.get("TOKEN_MULTIPLIER"));
 
+  // 是否透传客户端 API key
+  const passthroughApiKey = Deno.env.get("PASSTHROUGH_API_KEY") === "true";
+
+  // 加载渠道配置
+  const channelConfigs = loadChannelConfigs();
+
   // 加载多组上游配置
   const upstreamConfigs = loadUpstreamConfigs();
 
@@ -120,6 +155,7 @@ export function loadConfig(): ProxyConfig {
     port,
     host,
     upstreamConfigs,
+    channelConfigs,
     upstreamBaseUrl,
     upstreamApiKey,
     upstreamModelOverride,
@@ -129,5 +165,6 @@ export function loadConfig(): ProxyConfig {
     maxRequestsPerMinute,
     tokenMultiplier,
     autoPort,
+    passthroughApiKey,
   };
 }

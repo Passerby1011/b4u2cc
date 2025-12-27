@@ -21,6 +21,11 @@ services:
       TIMEOUT_MS: 120000
       MAX_REQUESTS_PER_MINUTE: 60
       TOKEN_MULTIPLIER: "1.0"
+      PASSTHROUGH_API_KEY: "false"  # 设置为 true 以启用 API key 透传
+      # 渠道配置示例（可选）
+      # CHANNEL_1_NAME: elysiver
+      # CHANNEL_1_BASE_URL: https://api.elysiver.com/v1/chat/completions
+      # CHANNEL_1_API_KEY: sk-elysiver-...
     ports:
       - "3456:3456"
     volumes:

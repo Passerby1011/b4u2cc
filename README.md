@@ -40,7 +40,19 @@ b4u2cc 是一个基于 Deno 的代理服务器，用于将 Claude Code 的请求
 - 可完全禁用日志以提高性能
 - 请求 ID 跟踪，便于调试
 
-## 快速开始
+### 🔑 API Key 透传
+- 支持将客户端 API key 直接透传给上游 API
+- 通过 `PASSTHROUGH_API_KEY=true` 启用
+- 客户端可以使用自己的 API key 而不是代理配置的密钥
+- 适用于多用户场景，每个用户使用自己的上游账户
+
+### 🔀 渠道+模型名透传
+- 支持 `渠道名+模型名` 格式，如 `elysiver+claude-sonnet-4-5-20250929`
+- 自动根据渠道名选择上游配置，将模型名透传给上游 API
+- 简化配置，只需配置渠道的 base URL 和 API key
+- 支持动态模型选择，无需为每个模型创建单独配置
+
+ ## 快速开始
 
 ### 环境要求
 - Deno 1.40+ 
@@ -100,8 +112,9 @@ curl http://localhost:3456/healthz
 | `CLAUDE_API_KEY` | 否 | - | Claude API 密钥（用于精确 token 计数） |
 | `LOG_LEVEL` | 否 | info | 日志级别（debug/info/warn/error） |
 | `LOGGING_DISABLED` | 否 | false | 是否完全禁用日志 |
+| `PASSTHROUGH_API_KEY` | 否 | false | 是否将客户端 API key 透传给上游 |
 
-#### 多上游配置（新）
+ #### 多上游配置（新）
 支持配置多组上游，每组包含以下四个环境变量，索引从1开始递增：
 
 | 变量名 | 必需 | 默认值 | 说明 |
@@ -131,7 +144,38 @@ UPSTREAM_CONFIG_2_REQUEST_MODEL=claude-sonnet-4.5
 UPSTREAM_CONFIG_2_NAME_MODEL=w2-claude-sonnet-4.5
 ```
 
-### Token 倍数格式
+#### 渠道配置（推荐）
+支持配置多个渠道，通过 `渠道名+模型名` 格式动态选择上游和模型：
+
+| 变量名 | 必需 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `CHANNEL_{n}_NAME` | 是* | - | 第 n 个渠道的名称（唯一标识） |
+| `CHANNEL_{n}_BASE_URL` | 是* | - | 第 n 个渠道的 API 地址 |
+| `CHANNEL_{n}_API_KEY` | 否 | - | 第 n 个渠道的 API 密钥 |
+
+**优势**：
+- 只需配置渠道，无需为每个模型创建配置
+- 客户端可以使用任意模型名，自动透传给上游
+- 支持快速切换不同上游服务
+- 配置简洁，易于管理
+
+**示例**：
+```bash
+# 配置两个渠道
+CHANNEL_1_NAME=elysiver
+CHANNEL_1_BASE_URL=https://api.elysiver.com/v1/chat/completions
+CHANNEL_1_API_KEY=sk-elysiver-...
+
+CHANNEL_2_NAME=openrouter
+CHANNEL_2_BASE_URL=https://openrouter.ai/api/v1/chat/completions
+CHANNEL_2_API_KEY=sk-or-...
+
+# 客户端使用
+# model: "elysiver+claude-sonnet-4-5-20250929"
+# model: "openrouter+anthropic/claude-3.5-sonnet"
+```
+
+ ### Token 倍数格式
 
 `TOKEN_MULTIPLIER` 支持多种格式：
 - 数字：`1.2`
@@ -194,7 +238,80 @@ curl -X POST http://localhost:3456/v1/messages/count_tokens \
 ./scripts/run-claude-via-proxy.sh
 ```
 
-## 架构设计
+### API Key 透传模式
+```bash
+# 启动时启用透传
+export PASSTHROUGH_API_KEY=true
+export UPSTREAM_BASE_URL="https://api.openai.com/v1/chat/completions"
+deno run --allow-net --allow-env src/main.ts
+
+# 客户端使用自己的 API key 请求
+curl -X POST http://localhost:3456/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer sk-your-own-api-key" \
+  -d '{
+    "model": "gpt-4",
+    "max_tokens": 1024,
+    "messages": [
+      {"role": "user", "content": "Hello"}
+    ],
+    "stream": true
+  }'
+```
+
+**透传模式说明**：
+- 启用 `PASSTHROUGH_API_KEY=true` 后，代理会将客户端的 API key 直接传递给上游
+- 如果客户端没有提供 API key，则回退使用配置中的 `UPSTREAM_API_KEY`
+- 适合多用户场景，每个用户使用自己的上游账户和配额
+- 可以与 `CLIENT_API_KEY` 配合使用，实现双重认证
+
+### 渠道+模型名模式
+```bash
+# 配置渠道
+export CHANNEL_1_NAME=elysiver
+export CHANNEL_1_BASE_URL=https://api.elysiver.com/v1/chat/completions
+export CHANNEL_1_API_KEY=sk-elysiver-...
+
+export CHANNEL_2_NAME=openrouter
+export CHANNEL_2_BASE_URL=https://openrouter.ai/api/v1/chat/completions
+export CHANNEL_2_API_KEY=sk-or-...
+
+# 启动服务
+deno run --allow-net --allow-env src/main.ts
+
+# 客户端使用渠道+模型名格式
+curl -X POST http://localhost:3456/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "elysiver+claude-sonnet-4-5-20250929",
+    "max_tokens": 1024,
+    "messages": [
+      {"role": "user", "content": "Hello"}
+    ],
+    "stream": true
+  }'
+
+# 使用另一个渠道
+curl -X POST http://localhost:3456/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openrouter+anthropic/claude-3.5-sonnet",
+    "max_tokens": 1024,
+    "messages": [
+      {"role": "user", "content": "Hello"}
+    ],
+    "stream": true
+  }'
+```
+
+**渠道模式说明**：
+- 使用 `渠道名+模型名` 格式（用 `+` 分隔）
+- 系统自动根据渠道名选择上游配置
+- `+` 后面的模型名会透传给上游 API
+- 支持任意模型名，无需预先配置
+- 可以快速切换不同上游服务
+
+ ## 架构设计
 
 ### 核心组件
 

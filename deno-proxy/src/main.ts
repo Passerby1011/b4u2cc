@@ -46,14 +46,23 @@ function unauthorized() {
   return jsonResponse({ error: "unauthorized" }, 401);
 }
 
+function extractClientApiKey(req: Request): string | undefined {
+  const header = req.headers.get("x-api-key") || req.headers.get("authorization");
+  if (!header) return undefined;
+  let key: string;
+  if (header.startsWith("Bearer ")) {
+    key = header.slice(7).trim();
+  } else {
+    key = header.trim();
+  }
+  return key || undefined;
+}
+
 function validateClientKey(req: Request, config: ProxyConfig): boolean {
   if (!config.clientApiKey) return true;
-  const header = req.headers.get("x-api-key") || req.headers.get("authorization");
-  if (!header) return false;
-  if (header.startsWith("Bearer ")) {
-    return header.slice(7) === config.clientApiKey;
-  }
-  return header === config.clientApiKey;
+  const clientKey = extractClientApiKey(req);
+  if (!clientKey) return false;
+  return clientKey === config.clientApiKey;
 }
 
 async function handleMessages(req: Request, requestId: string) {
@@ -93,10 +102,25 @@ async function handleMessages(req: Request, requestId: string) {
     const upstreamReq = { ...openaiBase, messages: injected.messages };
 
     await rateLimiter.acquire();
-    const upstreamRes = await callUpstream(upstreamReq, upstreamConfig, config.requestTimeoutMs, requestId);
+
+    // 如果启用了透传，提取客户端 API key
+    // 逻辑：只有当客户端提供的 key 存在且不等于代理自身的 clientApiKey 时，才进行透传
+    const rawClientKey = extractClientApiKey(req);
+    const clientApiKey = (config.passthroughApiKey && rawClientKey && rawClientKey !== config.clientApiKey)
+      ? rawClientKey
+      : undefined;
+
+    const upstreamRes = await callUpstream(
+      upstreamReq,
+      upstreamConfig,
+      config.requestTimeoutMs,
+      requestId,
+      clientApiKey,
+    );
     await logRequest(requestId, "info", "Upstream responded", {
       status: upstreamRes.status,
       url: upstreamConfig.baseUrl,
+      usingPassthroughApiKey: !!clientApiKey,
     });
 
     if (!upstreamRes.ok) {
