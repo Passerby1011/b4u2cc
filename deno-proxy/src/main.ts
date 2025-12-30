@@ -65,8 +65,8 @@ async function handleMessages(req: Request, requestId: string) {
       ? rawClientKey
       : undefined;
 
-    // 判断是否为流式请求
-    const isStream = body.stream !== false;
+    // 判断是否为流式请求：Anthropic 默认为非流式，仅当显式设为 true 时才流式
+    const isStream = body.stream === true;
 
     if (isStream) {
       // 创建响应流

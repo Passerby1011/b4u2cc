@@ -74,7 +74,7 @@ export async function forwardRequest(
     "Content-Type": "application/json",
   };
 
-  const isStream = request.stream !== false;
+  const isStream = request.stream === true;
 
   if (protocol === "openai") {
     const openaiReq = mapClaudeToOpenAI(enrichedRequest, requestModel);
