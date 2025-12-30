@@ -28,7 +28,50 @@ export function estimateTokensFromText(text: string, model: string = "cl100k_bas
 }
 
 /**
- * 从 Claude 消息中提取所有文本内容
+ * 模拟 API 协议格式提取文本，以获得更准确的 token 计数
+ * 包含角色标签和消息分隔符的开销
+ */
+export function extractTextForCounting(request: ClaudeRequest): string {
+  let fullPrompt = "";
+
+  // 1. 添加系统提示词（包含包装开销）
+  if (request.system) {
+    const systemText = typeof request.system === "string"
+      ? request.system
+      : request.system.map(block => block.type === "text" ? block.text : "").join("");
+    fullPrompt += `System: ${systemText}\n\n`;
+  }
+
+  // 2. 遍历消息
+  for (const msg of request.messages) {
+    const role = msg.role.charAt(0).toUpperCase() + msg.role.slice(1);
+    fullPrompt += `${role}: `;
+
+    if (typeof msg.content === "string") {
+      fullPrompt += msg.content;
+    } else {
+      for (const block of msg.content) {
+        if (block.type === "text") {
+          fullPrompt += block.text;
+        } else if (block.type === "tool_use") {
+          // 模拟工具调用的 XML 或 JSON 结构开销
+          fullPrompt += `<tool_use>${block.name}${JSON.stringify(block.input)}</tool_use>`;
+        } else if (block.type === "tool_result") {
+          fullPrompt += `<tool_result>${block.content}</tool_result>`;
+        }
+      }
+    }
+    fullPrompt += "\n\n";
+  }
+
+  // 3. 模拟 Assistant 响应开始标签
+  fullPrompt += "Assistant: ";
+
+  return fullPrompt;
+}
+
+/**
+ * 从 Claude 消息中提取所有文本内容（简易版，保留兼容性）
  */
 export function extractTextFromMessages(messages: ClaudeMessage[]): string {
   return messages.map((message) => {
@@ -60,16 +103,12 @@ export async function estimateTokensLocally(
   config: ProxyConfig,
   requestId: string,
 ): Promise<TokenCountResult> {
-  const allText = extractTextFromMessages(request.messages);
-  let estimatedTokens = estimateTokensFromText(allText, request.model);
+  // 使用增强后的模拟 Prompt 计算输入
+  const promptForCounting = extractTextForCounting(request);
+  let estimatedTokens = estimateTokensFromText(promptForCounting, request.model);
 
-  // 添加系统提示的 token
-  if (request.system) {
-    const systemText = typeof request.system === "string"
-      ? request.system
-      : request.system.map(block => block.type === "text" ? block.text : "").join("");
-    estimatedTokens += estimateTokensFromText(systemText, request.model);
-  }
+  // 额外补偿：基础协议开销（通常为 3-10 tokens）
+  estimatedTokens += 3;
 
   // 添加工具定义的 token
   if (request.tools && request.tools.length > 0) {
@@ -94,12 +133,12 @@ export async function estimateTokensLocally(
     Math.ceil(
       Number.isFinite(rawAdjusted)
         ? rawAdjusted
-        : estimatedTokens,
+        : (estimatedTokens || 1),
     ),
   );
 
   await logRequest(requestId, "debug", "Local token estimation with tiktoken", {
-    textLength: allText.length,
+    promptLength: promptForCounting.length,
     estimatedTokens,
     multiplier,
     adjustedTokens,

@@ -23,13 +23,15 @@ interface StreamContext {
   thinkingBlockOpen: boolean;
   finished: boolean;
   totalOutputTokens: number;
+  outputBuffer: string; // 用于最后一次性精确计算
+  model: string; // 用于显示和计费
 }
 
 export class ClaudeStream {
   private context: StreamContext;
   private tokenMultiplier: number;
 
-  constructor(private writer: SSEWriter, config: ProxyConfig, requestId: string, inputTokens: number = 0) {
+  constructor(private writer: SSEWriter, config: ProxyConfig, requestId: string, inputTokens: number = 0, model: string = "claude-3-5-sonnet-20241022") {
     this.context = {
       requestId,
       writer,
@@ -39,6 +41,8 @@ export class ClaudeStream {
       thinkingBlockOpen: false,
       finished: false,
       totalOutputTokens: 0,
+      outputBuffer: "",
+      model,
     };
     this.tokenMultiplier = Number.isFinite(config.tokenMultiplier) && config.tokenMultiplier > 0
       ? config.tokenMultiplier
@@ -60,7 +64,7 @@ export class ClaudeStream {
           id: `msg_${this.context.requestId}`,
           type: "message",
           role: "assistant",
-          model: "claude-proxy",
+          model: this.context.model, // 使用真实模型名，不再硬编码
           stop_sequence: null,
           usage: {
             input_tokens: inputTokens,
@@ -113,7 +117,10 @@ export class ClaudeStream {
   private async flushText(text: string) {
     if (!text) return;
     await this.ensureTextBlock();
-    const estimatedTokens = countTokensWithTiktoken(text, "cl100k_base");
+    // 累加到 buffer
+    this.context.outputBuffer += text;
+    // 临时估算以便实时显示（非精确，finish 时会修正）
+    const estimatedTokens = countTokensWithTiktoken(text, this.context.model);
     this.context.totalOutputTokens += estimatedTokens;
     await this.writer.send({
       event: "content_block_delta",
@@ -163,7 +170,9 @@ export class ClaudeStream {
   private async emitThinking(content: string) {
     if (!content) return;
     await this.ensureThinkingBlock();
-    const estimatedTokens = countTokensWithTiktoken(content, "cl100k_base");
+    // 累加到 buffer
+    this.context.outputBuffer += content;
+    const estimatedTokens = countTokensWithTiktoken(content, this.context.model);
     this.context.totalOutputTokens += estimatedTokens;
     await this.writer.send({
       event: "content_block_delta",
@@ -189,6 +198,10 @@ export class ClaudeStream {
     }, true);
 
     const inputJson = JSON.stringify(call.arguments);
+    // 工具调用也计入 buffer 和统计
+    this.context.outputBuffer += inputJson;
+    this.context.totalOutputTokens += countTokensWithTiktoken(inputJson, this.context.model);
+
     await this.writer.send({
       event: "content_block_delta",
       data: {
@@ -213,14 +226,18 @@ export class ClaudeStream {
     await this.context.aggregator.flushAsync();
     await this.endTextBlock();
     await this.endThinkingBlock();
+
+    // 最后进行一次精确的全量重新计算，解决分段计分偏高的问题
+    const exactTotalTokens = countTokensWithTiktoken(this.context.outputBuffer, this.context.model);
+    this.context.totalOutputTokens = exactTotalTokens;
     
-    const raw = this.context.totalOutputTokens * this.tokenMultiplier;
+    const raw = exactTotalTokens * this.tokenMultiplier;
     const adjustedOutputTokens = Math.max(
       1,
       Math.ceil(
         Number.isFinite(raw)
           ? raw
-          : this.context.totalOutputTokens || 1,
+          : exactTotalTokens || 1,
       ),
     );
     

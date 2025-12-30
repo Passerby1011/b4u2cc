@@ -8,6 +8,7 @@ import { handleOpenAIStream } from "./handle_openai_stream.ts";
 import { handleAnthropicStream } from "./handle_anthropic_stream.ts";
 import { countTokensWithTiktoken } from "./tiktoken.ts";
 import { ToolifyParser } from "./parser.ts";
+import { countTokensLocally } from "./token_counter.ts";
 
 export async function forwardRequest(
   request: ClaudeRequest,
@@ -131,7 +132,10 @@ export async function forwardRequest(
 
   // 5. 处理响应
   const thinkingEnabled = request.thinking?.type === "enabled";
-  const inputTokens = countTokensWithTiktoken(fetchBody, "cl100k_base");
+  
+  // 使用增强后的本地计数器计算输入 Token
+  const localUsage = await countTokensLocally(enrichedRequest, config, requestId);
+  const inputTokens = localUsage.input_tokens;
 
   if (isStream && writer) {
     if (protocol === "openai") {
@@ -143,6 +147,7 @@ export async function forwardRequest(
         triggerSignal,
         thinkingEnabled,
         inputTokens,
+        request.model, // 传入原始模型名
       );
       return { inputTokens, outputTokens: result?.outputTokens };
     } else {
@@ -154,6 +159,7 @@ export async function forwardRequest(
         triggerSignal,
         thinkingEnabled,
         inputTokens,
+        request.model, // 传入原始模型名
       );
       return { inputTokens, outputTokens: result?.outputTokens };
     }
@@ -162,7 +168,6 @@ export async function forwardRequest(
     const json = await response.json();
     if (protocol === "openai") {
       // 将 OpenAI 非流式响应转换为 Claude 格式
-      // 注意：这里需要模拟 Toolify 解析逻辑，因为非流式响应也可能包含工具调用 XML
       const rawContent = json.choices?.[0]?.message?.content ?? "";
       const parser = new ToolifyParser(triggerSignal, thinkingEnabled);
       for (const char of rawContent) {
@@ -172,12 +177,14 @@ export async function forwardRequest(
       const events = parser.consumeEvents();
 
       const contentBlocks: any[] = [];
+      let outputBuffer = "";
       for (const event of events) {
         if (event.type === "text") {
           contentBlocks.push({ type: "text", text: event.content });
+          outputBuffer += event.content;
         } else if (event.type === "thinking") {
-          // 非流式请求中，Anthropic 官方 API 不返回 thinking 块
-          // 因此我们不将其放入 contentBlocks
+          // 非流式响应中我们也记录思考过程以便计算 token，但根据需求可能不返回给客户端
+          outputBuffer += event.content;
           log("debug", "Excluding thinking block from non-streaming response", { requestId });
         } else if (event.type === "tool_call") {
           contentBlocks.push({
@@ -186,14 +193,18 @@ export async function forwardRequest(
             name: event.call.name,
             input: event.call.arguments,
           });
+          outputBuffer += JSON.stringify(event.call.arguments);
         }
       }
+
+      // 精确重新计算输出 Token
+      const outputTokens = countTokensWithTiktoken(outputBuffer, request.model);
 
       return {
         id: `chatcmpl-${requestId}`,
         type: "message",
         role: "assistant",
-        model: requestModel,
+        model: request.model, // 确保返回原始模型名
         content: contentBlocks.length > 0 ? contentBlocks : [{ type: "text", text: "" }],
         stop_reason: contentBlocks.some((b) => b.type === "tool_use")
           ? "tool_use"
@@ -201,11 +212,15 @@ export async function forwardRequest(
         stop_sequence: null,
         usage: {
           input_tokens: json.usage?.prompt_tokens ?? inputTokens,
-          output_tokens: json.usage?.completion_tokens ?? 0,
+          output_tokens: outputTokens || (json.usage?.completion_tokens ?? 0),
         },
       };
     } else {
-      // Anthropic 非流式本身就是 Claude 格式，直接透传
+      // Anthropic 非流式
+      // 确保返回的模型名是原始请求的
+      if (json && typeof json === 'object') {
+        json.model = request.model;
+      }
       return json;
     }
   }

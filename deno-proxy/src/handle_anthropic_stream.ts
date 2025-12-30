@@ -12,9 +12,10 @@ export async function handleAnthropicStream(
   triggerSignal?: string,
   thinkingEnabled = false,
   inputTokens = 0,
+  model = "claude-3-5-sonnet-20241022",
 ) {
   const parser = new ToolifyParser(triggerSignal, thinkingEnabled, requestId);
-  const claudeStream = new ClaudeStream(writer, config, requestId, inputTokens);
+  const claudeStream = new ClaudeStream(writer, config, requestId, inputTokens, model);
 
   await claudeStream.init();
 
