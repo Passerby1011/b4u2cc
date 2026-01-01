@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std/http/server.ts";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { loadConfig, ProxyConfig } from "./config.ts";
 import { log, logRequest, closeRequestLog, logRequestStart, logRequestComplete, logPhase, LogPhase } from "./logging.ts";
 import { forwardRequest } from "./upstream.ts";
