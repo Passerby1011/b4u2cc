@@ -253,14 +253,6 @@ export const handler = async (req: Request) => {
     }
   }
 
-  if (req.method === "GET" && url.pathname === "/") {
-    const html = `<!DOCTYPE html><html><head><title>cc-proxy</title></head><body><h1>cc-proxy Server</h1><p>Server is running</p><p><a href="/admin">管理后台</a></p></body></html>`;
-    return new Response(html, {
-      status: 200,
-      headers: { "content-type": "text/html" }
-    });
-  }
-
   if (req.method === "GET" && url.pathname === "/healthz") {
     return jsonResponse({ status: "ok" });
   }

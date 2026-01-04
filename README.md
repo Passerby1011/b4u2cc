@@ -59,8 +59,11 @@ cc-proxy 是一个基于 Deno 的智能代理服务器，通过"提示词注入 
 - ✅ **访问控制**: 可配置客户端 API Key 验证
 - ✅ **速率限制**: 内置请求频率控制，防止滥用
 
-### 📊 监控与计费
+### 📊 监控与管理
 
+- ✅ **管理后台 (Web UI)**: 提供简洁美观的可视化配置管理界面，支持在线修改渠道、协议等所有配置
+- ✅ **灵活存储方案**: 支持本地 JSON 文件或远程 PostgreSQL 数据库持久化配置
+- ✅ **实时同步**: 支持从存储后端手动重载配置，无需重启服务
 - ✅ **Token 计数**: 精确的 tiktoken 本地计数，支持 Claude API 集成
 - ✅ **Token 倍数**: 支持自定义倍数调整，便于计费管理
 - ✅ **结构化日志**: 详细的请求日志，支持按请求 ID 追踪
@@ -100,32 +103,31 @@ git clone https://github.com/Passerby1011/cc-proxy.git
 cd cc-proxy
 ```
 
-2. **配置环境变量**
-
-```bash
-# 渠道 1: OpenAI 兼容 API
-export CHANNEL_1_NAME=my_openai
-export CHANNEL_1_BASE_URL=https://api.openai.com/v1/chat/completions
-export CHANNEL_1_API_KEY=sk-xxx
-export CHANNEL_1_PROTOCOL=openai
-
-# 渠道 2: Anthropic 原生 API (无工具调用模式)
-export CHANNEL_2_NAME=my_ant
-export CHANNEL_2_BASE_URL=https://api.anthropic.com/v1/messages
-export CHANNEL_2_API_KEY=sk-ant-xxx
-export CHANNEL_2_PROTOCOL=anthropic
-
-# 其他配置
-export PORT=3456
-export LOG_LEVEL=info
-```
-
-3. **启动服务**
+2. **启动服务**
 
 ```bash
 cd deno-proxy
-deno run --allow-net --allow-env src/main.ts
+
+# 设置管理员密钥（必需）
+export ADMIN_API_KEY=your-secure-admin-key
+
+# 可选：指定端口和日志级别
+export PORT=3456
+export LOG_LEVEL=info
+
+# 启动服务
+deno run --allow-net --allow-env --allow-read --allow-write src/main.ts
 ```
+
+3. **访问管理后台**
+
+在浏览器中访问 `http://localhost:3456/admin`，使用 `ADMIN_API_KEY` 登录后即可：
+
+- 配置上游渠道（支持多个 OpenAI/Anthropic 兼容服务）
+- 设置客户端 API 密钥验证
+- 配置速率限制、超时时间等
+- 选择本地文件或 PostgreSQL 存储
+- 所有配置即时生效，无需重启
 
 4. **测试服务**
 
@@ -133,9 +135,10 @@ deno run --allow-net --allow-env src/main.ts
 # 健康检查
 curl http://localhost:3456/healthz
 
-# 测试工具调用
+# 测试工具调用（假设已在管理后台配置了名为 my_openai 的渠道）
 curl -X POST http://localhost:3456/v1/messages \
   -H "Content-Type: application/json" \
+  -H "x-api-key: your-client-api-key" \
   -d '{
     "model": "my_openai+gpt-4o",
     "messages": [{"role": "user", "content": "What is the weather?"}],
@@ -146,62 +149,83 @@ curl -X POST http://localhost:3456/v1/messages \
 
 ## 配置说明
 
-### 渠道配置 (推荐方式)
+### 管理后台 (Web UI) - 推荐方式
 
-新版本推荐使用"渠道"配置，支持配置多个上游服务。每个渠道通过索引（1, 2, ...）定义：
+新版本提供了可视化的管理后台，这是**推荐的配置方式**。
 
-| 变量名 | 必需 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `CHANNEL_{n}_NAME` | 是 | - | 渠道标识符，用于模型名前缀 |
-| `CHANNEL_{n}_BASE_URL` | 是 | - | 上游 API 地址 |
-| `CHANNEL_{n}_API_KEY` | 否 | - | 上游 API 密钥（可由客户端透传） |
-| `CHANNEL_{n}_PROTOCOL` | 否 | 自动识别 | 上游协议类型：`openai` 或 `anthropic`。若未指定，将根据 `BASE_URL` 自动识别（`/v1/chat/completions` -> `openai`，`/v1/messages` -> `anthropic`） |
+#### 访问管理后台
 
-**配置示例**:
+1. **启动服务时设置管理员密钥**（必需）
 
 ```bash
-# 渠道 1: OpenAI 兼容 API
-export CHANNEL_1_NAME=my_openai
-export CHANNEL_1_BASE_URL=https://api.openai.com/v1/chat/completions
-export CHANNEL_1_API_KEY=sk-xxx
-export CHANNEL_1_PROTOCOL=openai
-
-# 渠道 2: Anthropic 原生 API (无工具调用模式)
-export CHANNEL_2_NAME=my_ant
-export CHANNEL_2_BASE_URL=https://api.anthropic.com/v1/messages
-export CHANNEL_2_API_KEY=sk-ant-xxx
-export CHANNEL_2_PROTOCOL=anthropic
-
-# 渠道 3: 本地模型
-export CHANNEL_3_NAME=local
-export CHANNEL_3_BASE_URL=http://localhost:8000/v1/chat/completions
-export CHANNEL_3_PROTOCOL=openai
+export ADMIN_API_KEY=your-secure-admin-key
+deno run --allow-net --allow-env --allow-read --allow-write src/main.ts
 ```
+
+2. **在浏览器中访问** `http://localhost:3456/admin`
+
+3. **使用 ADMIN_API_KEY 登录**
+
+#### 管理后台功能
+
+通过 Web UI，您可以直观地配置所有选项：
+
+##### 📡 渠道管理
+- **添加/删除渠道**: 支持配置多个上游服务（OpenAI、Anthropic 或其他兼容 API）
+- **渠道配置项**:
+  - `渠道标识`: 用于客户端模型名前缀（如 `my_openai`）
+  - `Base URL`: 上游 API 地址
+  - `API Key`: 上游服务的密钥（可选，支持客户端透传）
+  - `协议类型`: `openai` 或 `anthropic`
+
+##### ⚙️ 系统配置
+- **网络设置**: 服务端口、绑定地址、请求超时
+- **安全控制**: 客户端 API 密钥验证、速率限制（RPM）
+- **Token 管理**: Token 价格乘数、是否透传客户端密钥
+- **数据存储**: 选择本地文件或 PostgreSQL 数据库
+
+##### 💾 配置持久化
+- **本地文件模式**: 配置保存到 `config.json`（默认）
+- **PostgreSQL 模式**: 设置 `PGSTORE_DSN` 后使用数据库存储
+- **实时同步**: 点击"同步数据"按钮可从存储后端重新加载配置
 
 ### 客户端使用方式
 
-配置好渠道后，客户端请求的模型名可以使用 `渠道名+模型名` 格式：
+配置好渠道后，客户端请求模型时使用 `渠道名+模型名` 格式：
 
-- `my_openai+gpt-4o`: 将请求通过渠道 1 发送，上游模型名为 `gpt-4o`
-- `my_ant+claude-3-5-sonnet-20241022`: 将请求通过渠道 2 发送，上游模型名为 `claude-3-5-sonnet-20241022`
-- `local+llama-3-70b`: 将请求通过渠道 3 发送，上游模型名为 `llama-3-70b`
+```bash
+# 示例：使用名为 my_openai 的渠道访问 gpt-4o 模型
+curl -X POST http://localhost:3456/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: your-client-api-key" \
+  -d '{
+    "model": "my_openai+gpt-4o",
+    "messages": [{"role": "user", "content": "Hello"}],
+    "max_tokens": 1024
+  }'
+```
 
-> 💡 **提示**: 如果不带 `+` 号，默认使用配置中的第一个渠道。
+**模型名格式说明**:
+- `渠道名+模型名`: 使用指定渠道，如 `my_openai+gpt-4o`
+- 仅模型名: 使用第一个配置的渠道
 
-### 全局配置
+### 环境变量配置（高级）
 
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `UPSTREAM_PROTOCOL` | `openai` | 全局默认协议，当渠道未指定时使用 |
-| `PASSTHROUGH_API_KEY` | `false` | 是否将客户端 Authorization 头的 Key 透传给上游 |
-| `CLIENT_API_KEY` | - | 代理服务器自身的访问密钥，用于验证客户端请求 |
-| `TOKEN_MULTIPLIER` | `1.0` | 计费 Token 倍数，支持 "1.2x", "120%" 等格式 |
+对于自动化部署或容器化场景，仍支持通过环境变量进行配置：
+
+| 环境变量 | 默认值 | 说明 |
+|---------|--------|------|
+| `ADMIN_API_KEY` | - | **必需** - 管理后台登录密钥 |
 | `PORT` | `3456` | 服务监听端口 |
-| `HOST` | `0.0.0.0` | 服务监听地址 |
-| `LOG_LEVEL` | `info` | 日志级别 (debug, info, warn, error) |
-| `MAX_REQUESTS_PER_MINUTE` | `60` | 每分钟最大请求数 |
-| `TIMEOUT_MS` | `120000` | 上游请求超时时间（毫秒） |
-| `CLAUDE_API_KEY` | - | Claude API 密钥，用于精确 Token 计数 |
+| `HOST` | `0.0.0.0` | 服务绑定地址 |
+| `LOG_LEVEL` | `info` | 日志级别（debug/info/warn/error） |
+| `PGSTORE_DSN` | - | PostgreSQL 连接字符串，如 `postgresql://user:pass@host:port/db` |
+| `CONFIG_FILE_PATH` | `config.json` | 本地配置文件路径 |
+
+> 💡 **提示**: 
+> - 首次启动时，可通过管理后台完成所有配置
+> - 配置会自动保存到本地文件或数据库，下次启动自动加载
+> - 环境变量中的配置项会覆盖存储中的相同配置（优先级更高）
 
 ## 架构设计
 
@@ -365,9 +389,23 @@ docker build -t cc-proxy:latest .
 docker run -d \
   --name cc-proxy \
   -p 3456:3456 \
-  -e CHANNEL_1_NAME=openai \
-  -e CHANNEL_1_BASE_URL=https://api.openai.com/v1/chat/completions \
-  -e CHANNEL_1_API_KEY=sk-xxx \
+  -e ADMIN_API_KEY=your-secure-admin-key \
+  -v $(pwd)/config.json:/app/config.json \
+  --restart unless-stopped \
+  cc-proxy:latest
+
+# 访问管理后台进行配置
+# http://localhost:3456/admin
+```
+
+**使用 PostgreSQL 存储**:
+
+```bash
+docker run -d \
+  --name cc-proxy \
+  -p 3456:3456 \
+  -e ADMIN_API_KEY=your-secure-admin-key \
+  -e PGSTORE_DSN=postgresql://user:pass@postgres:5432/cc_proxy \
   --restart unless-stopped \
   cc-proxy:latest
 ```

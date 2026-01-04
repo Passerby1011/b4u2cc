@@ -15,26 +15,26 @@
     </script>
     <style>
         :root {
-            --bg-start: #000000;
-            --bg-end: #080808;
-            --surface-0: rgba(255, 255, 255, 0.02);
-            --surface-1: rgba(255, 255, 255, 0.05);
-            --surface-hover: rgba(255, 255, 255, 0.08);
-            --border: rgba(255, 255, 255, 0.08);
-            --text-primary: #ffffff;
-            --text-secondary: rgba(255, 255, 255, 0.6);
-            --text-tertiary: rgba(255, 255, 255, 0.3);
-            --primary-accent: #ffffff;
-            --danger: #ff4d4f;
-            --success: #49aa19;
-            --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+            --bg-start: #f8fafc;
+            --bg-end: #f1f5f9;
+            --surface-0: #ffffff;
+            --surface-1: #ffffff;
+            --surface-hover: #f8fafc;
+            --border: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-tertiary: #94a3b8;
+            --primary-accent: #0f172a;
+            --danger: #ef4444;
+            --success: #10b981;
+            --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
             --radius-md: 12px;
             --radius-sm: 8px;
             --spacing-xs: 8px;
             --spacing-sm: 16px;
             --spacing-md: 24px;
             --spacing-lg: 40px;
-            --font-sans: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --font-sans: "Inter", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
         body {
@@ -51,16 +51,16 @@
 
         /* Layout */
         .container {
-            max-width: 720px;
+            max-width: 800px;
             margin: 0 auto;
             display: flex;
             flex-direction: column;
             gap: var(--spacing-lg);
-            animation: fadeIn 0.5s ease-out;
+            animation: fadeIn 0.4s ease-out;
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(8px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
@@ -72,48 +72,44 @@
         }
 
         h2 {
-            font-size: 20px;
+            font-size: 18px;
             margin-bottom: var(--spacing-md);
             color: var(--text-primary);
             display: flex;
             align-items: center;
-            gap: 12px;
-            font-weight: 500;
+            gap: 10px;
         }
 
         h2 svg {
             color: var(--text-secondary);
-            opacity: 0.8;
+            opacity: 0.7;
         }
 
         label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             font-size: 13px;
             font-weight: 500;
             color: var(--text-secondary);
-            letter-spacing: 0.01em;
         }
 
         /* Cards */
         .card {
             background: var(--surface-0);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
             padding: 32px;
             box-shadow: var(--shadow-card);
-            transition: transform 0.2s ease, border-color 0.2s ease;
+            transition: border-color 0.2s ease;
         }
         
         .card:hover {
-            border-color: rgba(255, 255, 255, 0.12);
+            border-color: #cbd5e1;
         }
 
         /* Inputs */
         .form-group {
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
         .form-group:last-child {
             margin-bottom: 0;
@@ -121,10 +117,10 @@
 
         input, select, textarea {
             width: 100%;
-            background: rgba(0, 0, 0, 0.2);
+            background: #ffffff;
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
-            padding: 12px 16px;
+            padding: 10px 14px;
             color: var(--text-primary);
             font-size: 14px;
             font-family: inherit;
@@ -134,22 +130,42 @@
 
         input:focus, select:focus {
             outline: none;
-            border-color: rgba(255, 255, 255, 0.2);
-            background: rgba(0, 0, 0, 0.4);
-            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+            border-color: var(--text-primary);
+            box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.05);
         }
         
         input::placeholder {
             color: var(--text-tertiary);
         }
+        
+        input:disabled {
+            background: #f8fafc;
+            color: var(--text-tertiary);
+            cursor: not-allowed;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .checkbox-group input {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+            cursor: pointer;
+        }
 
         /* Buttons */
         button {
-            background: var(--surface-1);
+            background: #ffffff;
             color: var(--text-primary);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
-            padding: 10px 16px;
+            padding: 8px 16px;
             font-size: 13px;
             font-weight: 500;
             cursor: pointer;
@@ -158,43 +174,45 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            text-decoration: none;
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
             background: var(--surface-hover);
-            border-color: rgba(255, 255, 255, 0.2);
-            transform: translateY(-1px);
+            border-color: #cbd5e1;
         }
         
-        button:active {
-            transform: translateY(0);
+        button:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         button.primary {
-            background: #ffffff;
-            color: #000000;
-            border-color: #ffffff;
+            background: var(--text-primary);
+            color: #ffffff;
+            border-color: var(--text-primary);
             font-weight: 600;
-            padding: 12px 24px;
-            font-size: 14px;
+            padding: 10px 24px;
         }
 
-        button.primary:hover {
-            background: #f0f0f0;
-            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+        button.primary:hover:not(:disabled) {
+            background: #1e293b;
+            border-color: #1e293b;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
         }
 
         button.danger {
-            color: var(--text-secondary);
+            color: var(--danger);
             border-color: transparent;
             background: transparent;
-            padding: 6px 12px;
         }
 
-        button.danger:hover {
-            color: var(--danger);
-            background: rgba(255, 77, 79, 0.1);
+        button.danger:hover:not(:disabled) {
+            background: #fef2f2;
+            border-color: #fee2e2;
         }
         
         button.add-btn {
@@ -205,10 +223,10 @@
             color: var(--text-secondary);
         }
         
-        button.add-btn:hover {
+        button.add-btn:hover:not(:disabled) {
             border-color: var(--text-secondary);
             color: var(--text-primary);
-            background: var(--surface-0);
+            background: #f8fafc;
         }
 
         /* Navigation */
@@ -216,29 +234,28 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0 8px;
+            padding: 0 4px;
         }
 
         .nav-brand {
-            font-size: 18px;
-            font-weight: 600;
+            font-size: 16px;
+            font-weight: 700;
             color: var(--text-primary);
             text-decoration: none;
-            letter-spacing: -0.02em;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
         
         .nav-brand-icon {
             width: 24px;
             height: 24px;
-            background: white;
+            background: var(--text-primary);
             border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: black;
+            color: white;
         }
 
         .status-badge {
@@ -251,6 +268,7 @@
             display: flex;
             align-items: center;
             gap: 6px;
+            box-shadow: var(--shadow-card);
         }
         
         .status-dot {
@@ -271,31 +289,26 @@
         }
 
         .channel-item {
-            background: rgba(0,0,0,0.2);
+            background: #f8fafc;
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
-            padding: 24px;
+            padding: 20px;
             position: relative;
-            transition: border-color 0.2s;
-        }
-
-        .channel-item:hover {
-            border-color: rgba(255, 255, 255, 0.15);
         }
 
         .channel-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 16px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
             border-bottom: 1px solid var(--border);
         }
 
         .channel-index {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
@@ -303,11 +316,17 @@
         .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            gap: 16px;
+        }
+        
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
         }
         
         @media (max-width: 600px) {
-            .grid-2 { grid-template-columns: 1fr; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
             .card { padding: 20px; }
         }
         
@@ -320,13 +339,48 @@
         
         .login-card {
             width: 100%;
-            max-width: 400px;
+            max-width: 380px;
         }
         
         .helper-text {
             font-size: 12px;
             color: var(--text-tertiary);
-            margin-top: 6px;
+            margin-top: 4px;
+        }
+        
+        .section-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 32px 0 16px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-title:first-child { margin-top: 0; }
+        
+        .section-title::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+        
+        /* Sticky Actions */
+        .sticky-actions {
+            position: sticky;
+            bottom: 32px;
+            display: flex;
+            justify-content: flex-end;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .sticky-actions button {
+            pointer-events: auto;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
@@ -341,27 +395,32 @@
         
         // Icons
         const Icons = {
-            Settings: () => html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`,
-            Layers: () => html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>`,
-            Save: () => html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>`,
-            Plus: () => html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`,
-            Trash: () => html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
-            Key: () => html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>`,
-            Zap: () => html`<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`
+            Settings: () => html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 10-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 10 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`,
+            Layers: () => html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>`,
+            Save: () => html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>`,
+            Plus: () => html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`,
+            Trash: () => html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
+            Refresh: () => html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>`,
+            Zap: () => html`<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`,
+            Shield: () => html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`,
+            Database: () => html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>`,
+            Globe: () => html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`
         };
 
         function App() {
             const [config, setConfig] = useState(null);
-            const [loading, setLoading] = useState(true);
+            const [loading, setLoading] = useState(false);
             const [apiKey, setApiKey] = useState(localStorage.getItem('admin_api_key') || '');
             const [message, setMessage] = useState('');
-            const [msgType, setMsgType] = useState(''); // 'success', 'error', ''
+            const [msgType, setMsgType] = useState('');
 
-            const fetchConfig = async () => {
+            const fetchConfig = async (key) => {
+                const targetKey = key || apiKey;
+                if (!targetKey) return;
                 setLoading(true);
                 try {
                     const res = await fetch('/admin/api/config', {
-                        headers: { 'Authorization': `Bearer ${apiKey}` }
+                        headers: { 'Authorization': `Bearer ${targetKey}` }
                     });
                     if (res.status === 401) {
                         setMessage('未授权，请输入 Admin API Key');
@@ -371,7 +430,7 @@
                     }
                     const data = await res.json();
                     setConfig(data);
-                    setMessage('就绪');
+                    setMessage('已连接');
                     setMsgType('success');
                 } catch (e) {
                     setMessage('连接失败: ' + e.message);
@@ -382,12 +441,12 @@
             };
 
             useEffect(() => {
-                if (apiKey) fetchConfig();
+                if (apiKey) fetchConfig(apiKey);
                 else setLoading(false);
             }, []);
 
             const saveConfig = async () => {
-                setMessage('保存配置中...');
+                setMessage('正在保存...');
                 setMsgType('');
                 try {
                     const res = await fetch('/admin/api/config', {
@@ -400,15 +459,15 @@
                     });
                     const data = await res.json();
                     if (data.status === 'success') {
-                        setMessage('配置已成功保存');
+                        setMessage('设置已成功更新');
                         setMsgType('success');
-                        setTimeout(() => setMessage('就绪'), 3000);
+                        setTimeout(() => setMessage('已连接'), 3000);
                     } else {
-                        setMessage('保存失败: ' + data.error);
+                        setMessage('更新失败: ' + data.error);
                         setMsgType('error');
                     }
                 } catch (e) {
-                    setMessage('保存请求错误: ' + e.message);
+                    setMessage('网络错误: ' + e.message);
                     setMsgType('error');
                 }
             };
@@ -424,69 +483,75 @@
             };
 
             const addChannel = () => {
-                const newChannels = [...(config.channelConfigs || []), { channel: '', model: '', upstreamUrl: '', apiKey: '' }];
+                const newChannels = [...(config.channelConfigs || []), { name: '', baseUrl: '', apiKey: '', protocol: config.defaultProtocol || 'openai' }];
                 setConfig({ ...config, channelConfigs: newChannels });
             };
 
             const removeChannel = (index) => {
-                if(!confirm('确定要删除这个渠道吗？')) return;
+                if(!confirm('确认移除该渠道？')) return;
                 const newChannels = config.channelConfigs.filter((_, i) => i !== index);
                 setConfig({ ...config, channelConfigs: newChannels });
             };
 
-            if (!apiKey && !config) {
+            if (!config) {
                 return html`
                     <div class="login-container">
                         <div class="container login-card">
                             <div class="card">
-                                <h2 style="justify-content: center; margin-bottom: 32px">
+                                <h2 style="justify-content: center; margin-bottom: 24px; font-size: 20px">
                                     <div class="nav-brand-icon"><${Icons.Zap} /></div>
                                     CC-Proxy Admin
                                 </h2>
                                 <div class="form-group">
-                                    <label>Admin API Key</label>
+                                    <label>管理 API 密钥</label>
                                     <input type="password" 
-                                           placeholder="输入密钥以继续..."
+                                           placeholder="输入密钥以开始管理..."
                                            value=${apiKey} 
                                            onInput=${e => setApiKey(e.target.value)} 
-                                           onKeyDown=${e => e.key === 'Enter' && (localStorage.setItem('admin_api_key', apiKey), fetchConfig())}
+                                           onKeyDown=${e => e.key === 'Enter' && (localStorage.setItem('admin_api_key', apiKey), fetchConfig(apiKey))}
                                     />
                                 </div>
-                                <button class="primary" style="width: 100%" onClick=${() => { localStorage.setItem('admin_api_key', apiKey); fetchConfig(); }}>
-                                    进入控制台
+                                <button class="primary" style="width: 100%" onClick=${() => { localStorage.setItem('admin_api_key', apiKey); fetchConfig(apiKey); }} disabled=${loading}>
+                                    ${loading ? '验证中...' : '进入管理面板'}
                                 </button>
+                                ${msgType === 'error' && html`<p style="color: var(--danger); font-size: 13px; margin-top: 16px; text-align: center">${message}</p>`}
                             </div>
                         </div>
                     </div>
                 `;
             }
 
-            if (loading) return html`
-                <div class="container" style="height: 100vh; justify-content: center; align-items: center; opacity: 0.7">
-                    <div>加载中...</div>
-                </div>
-            `;
-
             return html`
                 <div class="container">
                     <div class="nav">
                         <a href="#" class="nav-brand">
                             <div class="nav-brand-icon"><${Icons.Zap} /></div>
-                            CC-Proxy
+                            CC-Proxy Dashboard
                         </a>
-                        <div class="status-badge">
-                            <div class="status-dot ${msgType === 'success' ? 'active' : (msgType === 'error' ? 'error' : '')}"></div>
-                            ${message || '就绪'}
+                        <div style="display: flex; gap: 12px; align-items: center">
+                            <button onClick=${() => fetchConfig()} disabled=${loading} title="从后端存储重新加载配置" style="padding: 6px 12px; font-size: 12px">
+                                <${Icons.Refresh} /> 同步数据
+                            </button>
+                            <div class="status-badge">
+                                <div class="status-dot ${msgType === 'success' ? 'active' : (msgType === 'error' ? 'error' : '')}"></div>
+                                ${message}
+                            </div>
                         </div>
                     </div>
 
                     <div class="card">
-                        <h2><${Icons.Settings} /> 核心配置</h2>
-                        <div class="grid-2">
+                        <h2><${Icons.Settings} /> 系统核心配置</h2>
+                        
+                        <div class="section-title">网络与协议</div>
+                        <div class="grid-3">
                             <div class="form-group">
-                                <label>监听端口</label>
+                                <label>服务端口</label>
                                 <input type="number" value=${config.port} onInput=${e => updateField('port', parseInt(e.target.value))} />
-                                <div class="helper-text">更改端口后需要手动重启服务生效</div>
+                                <div class="helper-text">0 表示随机分配</div>
+                            </div>
+                            <div class="form-group">
+                                <label>绑定地址</label>
+                                <input type="text" value=${config.host} onInput=${e => updateField('host', e.target.value)} />
                             </div>
                             <div class="form-group">
                                 <label>默认上游协议</label>
@@ -496,54 +561,133 @@
                                 </select>
                             </div>
                         </div>
+
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label>请求超时 (ms)</label>
+                                <input type="number" value=${config.requestTimeoutMs} onInput=${e => updateField('requestTimeoutMs', parseInt(e.target.value))} />
+                            </div>
+                            <div class="form-group">
+                                <label>聚合间隔 (ms)</label>
+                                <input type="number" value=${config.aggregationIntervalMs} onInput=${e => updateField('aggregationIntervalMs', parseInt(e.target.value))} />
+                                <div class="helper-text">流式响应聚合时间窗口</div>
+                            </div>
+                        </div>
+
+                        <div class="section-title">安全与访问控制</div>
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label>客户端 API 密钥</label>
+                                <input type="password" placeholder="留空则不验证" value=${config.clientApiKey} onInput=${e => updateField('clientApiKey', e.target.value)} />
+                            </div>
+                            <div class="form-group">
+                                <label>管理 API 密钥</label>
+                                <input type="password" value=${config.adminApiKey} onInput=${e => updateField('adminApiKey', e.target.value)} />
+                            </div>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label>每分钟频率限制 (RPM)</label>
+                                <input type="number" value=${config.maxRequestsPerMinute} onInput=${e => updateField('maxRequestsPerMinute', parseInt(e.target.value))} />
+                            </div>
+                            <div class="form-group">
+                                <label>Token 价格乘数</label>
+                                <input type="number" step="0.1" value=${config.tokenMultiplier} onInput=${e => updateField('tokenMultiplier', parseFloat(e.target.value))} />
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="checkbox-group">
+                                <input type="checkbox" checked=${config.passthroughApiKey} onChange=${e => updateField('passthroughApiKey', e.target.checked)} />
+                                <span>透传客户端 API 密钥给上游</span>
+                            </label>
+                            <div class="helper-text" style="margin-left: 28px">启用后，将使用客户端发送的 API Key 而非配置的密钥</div>
+                        </div>
                     </div>
 
                     <div class="card">
-                        <h2><${Icons.Layers} /> 渠道管理</h2>
+                        <h2><${Icons.Layers} /> 渠道与上游管理</h2>
+                        
                         <div class="channel-list">
+                            ${(config.channelConfigs || []).length === 0 && html`
+                                <div class="section-title">向后兼容配置 (仅当无渠道时生效)</div>
+                                <div class="form-group">
+                                    <label>默认上游 Base URL</label>
+                                    <input value=${config.upstreamBaseUrl} onInput=${e => updateField('upstreamBaseUrl', e.target.value)} />
+                                </div>
+                                <div class="grid-2">
+                                    <div class="form-group">
+                                        <label>默认上游 API Key</label>
+                                        <input type="password" value=${config.upstreamApiKey} onInput=${e => updateField('upstreamApiKey', e.target.value)} />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>强制模型覆盖 (可选)</label>
+                                        <input placeholder="例如: gpt-4o" value=${config.upstreamModelOverride} onInput=${e => updateField('upstreamModelOverride', e.target.value)} />
+                                    </div>
+                                </div>
+                            `}
+
                             ${(config.channelConfigs || []).map((ch, i) => html`
                                 <div class="channel-item">
                                     <div class="channel-header">
-                                        <span class="channel-index">CHANNEL #${i + 1}</span>
+                                        <span class="channel-index">多渠道节点 #${i + 1}</span>
                                         <button class="danger" onClick=${() => removeChannel(i)}>
-                                            <${Icons.Trash} /> 移除
+                                            <${Icons.Trash} /> 移除节点
                                         </button>
                                     </div>
                                     <div class="grid-2">
                                         <div class="form-group">
                                             <label>渠道标识</label>
-                                            <input placeholder="例如: gpt-4-turbo" value=${ch.channel} onInput=${e => updateChannel(i, 'channel', e.target.value)} />
+                                            <input placeholder="如: gpt-4o" value=${ch.name} onInput=${e => updateChannel(i, 'name', e.target.value)} />
                                         </div>
                                         <div class="form-group">
-                                            <label>上游模型名</label>
-                                            <input placeholder="例如: claude-3-opus-20240229" value=${ch.model} onInput=${e => updateChannel(i, 'model', e.target.value)} />
+                                            <label>协议类型</label>
+                                            <select value=${ch.protocol} onChange=${e => updateChannel(i, 'protocol', e.target.value)}>
+                                                <option value="openai">OpenAI</option>
+                                                <option value="anthropic">Anthropic</option>
+                                            </select>
                                         </div>
                                     </div>
                                     <div class="form-group">
-                                        <label>上游 API URL</label>
-                                        <input placeholder="https://api.anthropic.com/v1/messages" value=${ch.upstreamUrl} onInput=${e => updateChannel(i, 'upstreamUrl', e.target.value)} />
+                                        <label>上游 Base URL</label>
+                                        <input placeholder="https://api.openai.com/v1/chat/completions" value=${ch.baseUrl} onInput=${e => updateChannel(i, 'baseUrl', e.target.value)} />
                                     </div>
                                     <div class="form-group" style="margin-bottom: 0">
-                                        <label>上游 API Key</label>
+                                        <label>上游 API 密钥</label>
                                         <input type="password" placeholder="sk-..." value=${ch.apiKey} onInput=${e => updateChannel(i, 'apiKey', e.target.value)} />
                                     </div>
                                 </div>
                             `)}
                         </div>
+                        
                         <div style="margin-top: 24px">
                             <button class="add-btn" onClick=${addChannel}>
-                                <${Icons.Plus} /> 添加新渠道
+                                <${Icons.Plus} /> 添加多渠道配置节点
                             </button>
                         </div>
                     </div>
 
-                    <div style="position: sticky; bottom: 40px; text-align: right; pointer-events: none;">
-                        <button class="primary" style="pointer-events: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5)" onClick=${saveConfig}>
-                            <${Icons.Save} /> 保存配置
+                    <div class="card">
+                        <h2><${Icons.Database} /> 数据存储与持久化</h2>
+                        <div class="form-group">
+                            <label>PostgreSQL DSN</label>
+                            <input type="password" placeholder="postgresql://user:pass@host:port/db" value=${config.pgStoreDsn} onInput=${e => updateField('pgStoreDsn', e.target.value)} />
+                            <div class="helper-text">留空则使用本地内存/文件存储。修改此项后需重启应用。</div>
+                        </div>
+                        <div class="form-group">
+                            <label>当前加载的配置文件</label>
+                            <input disabled value=${config.configFilePath || '环境变量加载'} />
+                        </div>
+                    </div>
+
+                    <div class="sticky-actions">
+                        <button class="primary" onClick=${saveConfig}>
+                            <${Icons.Save} /> 保存所有更改
                         </button>
                     </div>
                     
-                    <div style="height: 40px"></div>
+                    <div style="height: 60px"></div>
                 </div>
             `;
         }
