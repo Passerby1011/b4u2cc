@@ -55,7 +55,7 @@
 
 ## ✨ 核心特性
 
-### 🛠️ 协议与模型支持
+### 方式一：Docker Compose（推荐）
 
 - ✅ **多协议支持**：原生支持 OpenAI 和 Anthropic 两种上游协议
 - ✅ **工具调用模拟**：通过 XML 提示词注入实现工具调用能力
@@ -85,7 +85,7 @@
 
 ## 🚀 快速开始
 
-### 环境要求
+3. **启动服务**
 
 - **Deno**: 2.0+ ([安装指南](https://deno.land/manual/getting_started/installation))
 - **操作系统**: Linux、macOS 或 Windows
@@ -385,13 +385,13 @@ deno test --allow-env --allow-net
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
+MIT License - 详见 [LICENSE](LICENSE) 文件。
 
 ## 🙏 致谢
 
-- 感谢 [Anthropic](https://www.anthropic.com/) 提供 Claude API
-- 感谢 [Deno](https://deno.land/) 提供优秀的运行时
-- 感谢所有贡献者的支持
+- [Anthropic](https://www.anthropic.com/) - Claude API
+- [Deno](https://deno.land/) - 现代化运行时
+- 所有贡献者
 
 ---
 
