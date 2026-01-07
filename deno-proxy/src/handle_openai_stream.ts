@@ -81,7 +81,6 @@ export async function handleOpenAIStream(
             parser.feedReasoning(delta.reasoning_content);
             await claudeStream.handleEvents(parser.consumeEvents());
           }
->>>>+++ REPLACE
 
         } catch (e) {
           log("error", "Failed to parse OpenAI SSE chunk", { error: String(e), jsonStr });
