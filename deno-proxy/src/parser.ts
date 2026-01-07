@@ -45,6 +45,7 @@ export class ToolifyParser {
       this.checkThinkingMode(char);
       if (this.thinkingMode) {
         this.thinkingBuffer += char;
+        this.checkThinkingEnd();
         return;
       }
     }
@@ -207,19 +208,15 @@ export class ToolifyParser {
 
     if (this.thinkingMode) {
       this.thinkingBuffer += char;
-      if (this.thinkingBuffer.endsWith(THINKING_END_TAG)) {
-        let thinkingContent = this.thinkingBuffer.slice(0, -THINKING_END_TAG.length);
-        thinkingContent = thinkingContent.replace(/^\s*>\s*/, "");
-        if (thinkingContent) {
-          this.events.push({ type: "thinking", content: thinkingContent });
-        }
-        this.thinkingBuffer = "";
-        this.thinkingMode = false;
-      }
+      this.checkThinkingEnd();
       return;
     }
 
     this.buffer += char;
+    this.checkThinkingModeInternal();
+  }
+
+  private checkThinkingModeInternal() {
     if (this.buffer.endsWith(THINKING_START_TAG)) {
       const textPortion = this.buffer.slice(0, -THINKING_START_TAG.length);
       if (textPortion) {
@@ -236,28 +233,29 @@ export class ToolifyParser {
 
   private checkThinkingMode(char: string) {
     if (!this.thinkingMode) {
-      const tempBuffer = this.buffer + char;
-      if (tempBuffer.endsWith(THINKING_START_TAG)) {
-        const textPortion = this.buffer.slice(0, -THINKING_START_TAG.length + 1);
+      this.buffer += char;
+      if (this.buffer.endsWith(THINKING_START_TAG)) {
+        const textPortion = this.buffer.slice(0, -THINKING_START_TAG.length);
         if (textPortion) {
           this.events.push({ type: "text", content: textPortion });
         }
         this.buffer = "";
         this.thinkingMode = true;
         this.thinkingBuffer = "";
-      } else {
-        this.buffer += char;
       }
-    } else {
-      if (this.thinkingBuffer.endsWith(THINKING_END_TAG)) {
-        let thinkingContent = this.thinkingBuffer.slice(0, -THINKING_END_TAG.length);
-        thinkingContent = thinkingContent.replace(/^\s*>\s*/, "");
-        if (thinkingContent) {
-          this.events.push({ type: "thinking", content: thinkingContent });
-        }
-        this.thinkingBuffer = "";
-        this.thinkingMode = false;
+    }
+  }
+
+  private checkThinkingEnd() {
+    if (this.thinkingBuffer.endsWith(THINKING_END_TAG)) {
+      let thinkingContent = this.thinkingBuffer.slice(0, -THINKING_END_TAG.length);
+      thinkingContent = thinkingContent.replace(/^\s*>\s*/, "");
+      if (thinkingContent) {
+        this.events.push({ type: "thinking", content: thinkingContent });
       }
+      this.thinkingBuffer = "";
+      this.thinkingMode = false;
+      this.buffer = ""; // 重置正文 buffer，因为标签已经处理完
     }
   }
 }
