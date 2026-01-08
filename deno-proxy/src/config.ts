@@ -7,6 +7,15 @@ export interface ChannelConfig {
   protocol?: "openai" | "anthropic"; // 渠道协议类型，默认为 openai
 }
 
+export interface ToolCallRetryConfig {
+  enabled: boolean;              // 是否启用重试（默认 false）
+  maxRetries: number;            // 最大重试次数（默认 1）
+  timeout: number;               // 单次重试超时（默认 30000ms）
+  strategy: 'correction';        // 固定使用修正提示策略
+  keepAlive: boolean;            // 重试期间保持连接（默认 true）
+  promptTemplate?: string;       // 自定义修正提示模板
+}
+
 export interface ProxyConfig {
   port: number;
   host: string;
@@ -27,6 +36,8 @@ export interface ProxyConfig {
   adminApiKey?: string;
   pgStoreDsn?: string;
   configFilePath?: string;
+  // 工具调用重试配置
+  toolCallRetry?: ToolCallRetryConfig;
 }
 
 /**
@@ -175,6 +186,21 @@ export function loadConfig(): ProxyConfig {
     upstreamModelOverride = Deno.env.get("UPSTREAM_MODEL");
   }
 
+  // 加载工具调用重试配置
+  const toolCallRetryEnabled = Deno.env.get("TOOL_RETRY_ENABLED") === "true";
+  let toolCallRetry: ToolCallRetryConfig | undefined;
+  
+  if (toolCallRetryEnabled) {
+    toolCallRetry = {
+      enabled: true,
+      maxRetries: Number(Deno.env.get("TOOL_RETRY_MAX_RETRIES") ?? "1"),
+      timeout: Number(Deno.env.get("TOOL_RETRY_TIMEOUT") ?? "30000"),
+      strategy: 'correction',
+      keepAlive: Deno.env.get("TOOL_RETRY_KEEP_ALIVE") !== "false", // 默认 true
+      promptTemplate: Deno.env.get("TOOL_RETRY_PROMPT_TEMPLATE"),
+    };
+  }
+
   return {
     port,
     host,
@@ -193,5 +219,6 @@ export function loadConfig(): ProxyConfig {
     adminApiKey,
     pgStoreDsn,
     configFilePath,
+    toolCallRetry,
   };
 }

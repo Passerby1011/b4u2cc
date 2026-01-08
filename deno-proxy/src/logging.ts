@@ -64,6 +64,9 @@ export const LogPhase = {
   COMPLETE: { icon: "✅", color: colors.green, label: "COMPLETE" },
   ERROR: { icon: "🔴", color: colors.red, label: "ERROR" },
   STATS: { icon: "📊", color: colors.cyan, label: "STATS" },
+  RETRY: { icon: "🔄", color: colors.yellow, label: "RETRY" },
+  RETRY_SUCCESS: { icon: "✨", color: colors.green, label: "RETRY_OK" },
+  RETRY_FAILED: { icon: "💥", color: colors.red, label: "RETRY_FAIL" },
 };
 
 // Request-specific log files

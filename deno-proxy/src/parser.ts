@@ -16,6 +16,7 @@ export class ToolifyParser {
   private buffer = ""; // 通用缓冲区
   private thinkingBuffer = "";
   private toolBuffer = "";
+  private textBeforeToolCall = ""; // 🔑 记录工具调用前的所有文本
   
   private readonly events: ParserEvent[] = [];
   private readonly requestId?: string;
@@ -142,6 +143,7 @@ export class ToolifyParser {
       const idx = this.buffer.indexOf(m.TC_START);
       const textBefore = this.buffer.slice(0, idx);
       if (textBefore) {
+        this.textBeforeToolCall += textBefore; // 🔑 累积前置文本
         this.events.push({ type: "text", content: textBefore });
       }
       
@@ -180,9 +182,10 @@ export class ToolifyParser {
       }
     } else if (this.state === "TOOL") {
       this.toolBuffer += this.buffer;
-      this.parseAndEmitToolCall();
+      this.parseAndEmitToolCall(); // 🔑 尝试解析，可能发出 tool_call_failed 事件
     } else {
       if (this.buffer) {
+        this.textBeforeToolCall += this.buffer; // 🔑 累积文本模式下的内容
         this.events.push({ type: "text", content: this.buffer });
       }
     }
@@ -194,6 +197,7 @@ export class ToolifyParser {
     this.buffer = "";
     this.thinkingBuffer = "";
     this.toolBuffer = "";
+    this.textBeforeToolCall = "";
   }
 
   consumeEvents(): ParserEvent[] {
@@ -226,7 +230,7 @@ export class ToolifyParser {
       name = match[1].trim();
       argsStr = match[2].trim();
     } else {
-      // 2. 如果正则匹配失败，尝试基于关键标记定位的“模糊匹配”
+      // 2. 如果正则匹配失败，尝试基于关键标记定位的"模糊匹配"
       const nStart = content.indexOf(m.NAME_START);
       const nEnd = content.indexOf(m.NAME_END, nStart + m.NAME_START.length);
       const aStart = content.indexOf(m.ARGS_START, nEnd + m.NAME_END.length);
@@ -262,12 +266,23 @@ export class ToolifyParser {
     }
 
     if (!found) {
-      log("warn", "No valid tool call found in tool buffer, falling back to text", {
+      // 🔑 确定失败原因
+      const reason = content.includes(m.TC_END) ? "malformed_json" : "incomplete_delimiter";
+      
+      log("warn", "No valid tool call found in tool buffer", {
         requestId: this.requestId,
+        reason,
         bufferSize: content.length,
         bufferPreview: content.slice(0, 1000),
       });
-      this.events.push({ type: "text", content });
+      
+      // 🔑 发出 tool_call_failed 事件而不是降级为文本
+      this.events.push({ 
+        type: "tool_call_failed", 
+        content,
+        reason,
+        priorText: this.textBeforeToolCall
+      });
     } else {
       const lastMatchEnd = regex.lastIndex;
       const remaining = content.slice(lastMatchEnd);

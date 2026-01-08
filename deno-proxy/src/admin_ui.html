@@ -782,6 +782,68 @@
                                     </label>
                                     <div class="helper-text" style="margin-left: 28px">启用后，将使用客户端发送的 API Key 而非配置的密钥</div>
                                 </div>
+
+                                <div class="section-title"><${Icons.Refresh} /> 工具调用重试机制</div>
+                                <div class="form-group">
+                                    <label class="checkbox-group">
+                                        <input type="checkbox" 
+                                               checked=${config.toolCallRetry?.enabled || false}
+                                               onChange=${e => updateField('toolCallRetry', {
+                                                   ...(config.toolCallRetry || {}),
+                                                   enabled: e.target.checked,
+                                                   maxRetries: (config.toolCallRetry?.maxRetries || 1),
+                                                   timeout: (config.toolCallRetry?.timeout || 30000),
+                                                   strategy: 'correction',
+                                                   keepAlive: (config.toolCallRetry?.keepAlive !== false),
+                                               })} />
+                                        <span>启用工具调用失败自动重试</span>
+                                    </label>
+                                    <div class="helper-text" style="margin-left: 28px">
+                                        ⚠️ 当工具调用格式解析失败时，自动向上游请求重新生成（会产生额外 API 费用）
+                                    </div>
+                                </div>
+
+                                ${config.toolCallRetry?.enabled && html`
+                                    <div class="grid-3">
+                                        <div class="form-group">
+                                            <label>最大重试次数</label>
+                                            <input type="number" 
+                                                   min="1" 
+                                                   max="3" 
+                                                   value=${config.toolCallRetry?.maxRetries || 1}
+                                                   onInput=${e => updateField('toolCallRetry', {
+                                                       ...config.toolCallRetry,
+                                                       maxRetries: parseInt(e.target.value)
+                                                   })} />
+                                            <div class="helper-text">建议 1-2 次</div>
+                                        </div>
+                                        
+                                        <div class="form-group">
+                                            <label>重试超时 (ms)</label>
+                                            <input type="number" 
+                                                   value=${config.toolCallRetry?.timeout || 30000}
+                                                   onInput=${e => updateField('toolCallRetry', {
+                                                       ...config.toolCallRetry,
+                                                       timeout: parseInt(e.target.value)
+                                                   })} />
+                                        </div>
+                                        
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label>自定义修正提示模板（可选）</label>
+                                        <textarea rows="3" 
+                                                  placeholder="留空使用默认模板"
+                                                  value=${config.toolCallRetry?.promptTemplate || ''}
+                                                  onInput=${e => updateField('toolCallRetry', {
+                                                      ...config.toolCallRetry,
+                                                      promptTemplate: e.target.value
+                                                  })}></textarea>
+                                        <div class="helper-text">
+                                            可用变量：{failedContent}, {priorText}, {TC_START}, {TC_END} 等
+                                        </div>
+                                    </div>
+                                `}
                             </div>
 
                             <div class="card">
