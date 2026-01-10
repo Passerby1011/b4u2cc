@@ -250,7 +250,7 @@ export function loadConfig(): ProxyConfig {
       enableSearchIntercept,
       enableFetchIntercept,
       searchMode: (Deno.env.get("WEB_SEARCH_MODE") ?? "smart") as "simple" | "smart",
-      autoTrigger: Deno.env.get("WEB_TOOLS_AUTO_TRIGGER") === "true", // 默认 false，等AI调用
+      autoTrigger: Deno.env.get("WEB_TOOLS_AUTO_TRIGGER") !== "false", // 默认 true，自动触发
       deepBrowseEnabled: Deno.env.get("DEEP_BROWSE_ENABLED") === "true",
       deepBrowseCount: Number(Deno.env.get("DEEP_BROWSE_COUNT") ?? "3"),
       deepBrowsePageContentLimit: Number(Deno.env.get("DEEP_BROWSE_PAGE_CONTENT_LIMIT") ?? "5000"),
