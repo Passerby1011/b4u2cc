@@ -117,7 +117,7 @@ deployctl deploy --project=cc-proxy deno-proxy/src/main.ts
 | `TIMEOUT_MS` | `120000` | 请求超时时间（毫秒） |
 | `AGGREGATION_INTERVAL_MS` | `35` | 流式响应聚合间隔（毫秒） |
 
-### 上游协议配置
+### 上游协议配置(推荐网页配置)
 
 | 环境变量 | 默认值 | 说明 |
 |---------|--------|------|
@@ -169,7 +169,7 @@ export CHANNEL_3_PROTOCOL=openai
 postgresql://username:password@host:port/database
 ```
 
-### 工具调用重试配置
+### 工具调用重试配置(推荐网页配置)
 
 | 环境变量 | 默认值 | 说明 |
 |---------|--------|------|
@@ -181,7 +181,7 @@ postgresql://username:password@host:port/database
 
 **注意**：启用重试会产生额外的 API 费用，建议仅在工具调用失败率较高时启用。
 
-### Firecrawl API 配置
+### Firecrawl API 配置(推荐网页配置)
 
 | 环境变量 | 默认值 | 说明 |
 |---------|--------|------|
@@ -191,7 +191,7 @@ postgresql://username:password@host:port/database
 | `FIRECRAWL_MAX_RETRIES` | `3` | 最大重试次数 |
 | `FIRECRAWL_RETRY_DELAY` | `1000` | 重试延迟（毫秒） |
 
-### Web Search 配置
+### Web Search 配置 (推荐网页配置)
 
 | 环境变量 | 默认值 | 说明 |
 |---------|--------|------|
@@ -207,12 +207,6 @@ postgresql://username:password@host:port/database
 - **智能模式（smart）**：调用上游 LLM 分析搜索结果并生成总结
 - **深入浏览（Deep Browse）**：智能模式下，AI 自动选择重要页面深入抓取
 
-### Web Fetch 配置
-
-| 环境变量 | 默认值 | 说明 |
-|---------|--------|------|
-| `ENABLE_WEB_FETCH_INTERCEPT` | `false` | 启用 Web Fetch 拦截 |
-| `MAX_FETCH_CONTENT_TOKENS` | `100000` | 内容最大 token 数（近似值） |
 
 ## 🙏 致谢
 
