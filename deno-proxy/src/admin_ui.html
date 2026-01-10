@@ -582,6 +582,7 @@
             enableSearchIntercept: false,
             enableFetchIntercept: false,
             searchMode: 'smart',
+            autoTrigger: false,
             deepBrowseEnabled: false,
             deepBrowseCount: 3,
             deepBrowsePageContentLimit: 5000,
@@ -936,7 +937,22 @@
 
                                 <div class="section-title">工作模式</div>
                                 <div class="form-group">
-                                    <label>Web Search 模式</label>
+                                    <label>拦截触发模式</label>
+                                    <select value=${config.webTools?.autoTrigger === true ? 'auto' : 'ondemand'}
+                                            onChange=${e => updateField('webTools', {
+                                                ...(config.webTools || DEFAULT_WEB_TOOLS),
+                                                autoTrigger: e.target.value === 'auto'
+                                            })}>
+                                        <option value="ondemand">按需拦截（推荐 - Claude Code 模式）</option>
+                                        <option value="auto">自动触发（Chat 模式）</option>
+                                    </select>
+                                    <div class="helper-text">
+                                        按需拦截：等待 AI 主动调用工具时才执行搜索，使用 AI 传入的 query 参数<br/>
+                                        自动触发：检测到工具定义就自动执行搜索，由 AI 生成搜索词
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Web Search 分析模式</label>
                                     <select value=${config.webTools?.searchMode || 'smart'}
                                             onChange=${e => updateField('webTools', {
                                                 ...(config.webTools || DEFAULT_WEB_TOOLS),
