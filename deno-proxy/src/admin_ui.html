@@ -1347,9 +1347,24 @@
                                                 <label>上游 Base URL</label>
                                                 <input placeholder="https://api.openai.com/v1/chat/completions" value=${ch.baseUrl} onInput=${e => updateChannel(i, 'baseUrl', e.target.value)} />
                                             </div>
-                                            <div class="form-group" style="margin-bottom: 0">
+                                            <div class="form-group">
                                                 <label>上游 API 密钥</label>
                                                 <input type="password" placeholder="sk-..." value=${ch.apiKey} onInput=${e => updateChannel(i, 'apiKey', e.target.value)} />
+                                            </div>
+                                            <div class="form-group" style="margin-bottom: 0">
+                                                <label>拦截触发模式（可选）</label>
+                                                <select value=${ch.autoTrigger === true ? 'auto' : ch.autoTrigger === false ? 'ondemand' : 'default'}
+                                                        onChange=${e => {
+                                                            const value = e.target.value;
+                                                            updateChannel(i, 'autoTrigger',
+                                                                value === 'default' ? undefined : value === 'auto' ? true : false
+                                                            );
+                                                        }}>
+                                                    <option value="default">使用全局配置</option>
+                                                    <option value="ondemand">按需拦截（Chat 模式）</option>
+                                                    <option value="auto">自动触发（Claude Code 模式）</option>
+                                                </select>
+                                                <div class="helper-text">留空则使用全局拦截触发模式配置</div>
                                             </div>
                                         </div>
                                     `)}
