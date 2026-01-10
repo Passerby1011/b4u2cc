@@ -196,13 +196,20 @@ postgresql://username:password@host:port/database
 | 环境变量 | 默认值 | 说明 |
 |---------|--------|------|
 | `ENABLE_WEB_SEARCH_INTERCEPT` | `false` | 启用 Web Search 拦截 |
+| `ENABLE_WEB_FETCH_INTERCEPT` | `false` | 启用 Web Fetch 拦截 |
+| `WEB_TOOLS_AUTO_TRIGGER` | `false` | 自动触发模式（true=检测到工具就执行，false=等AI调用） |
 | `WEB_SEARCH_MODE` | `smart` | 工作模式（simple/smart） |
 | `MAX_SEARCH_RESULTS` | `10` | 最大搜索结果数量 |
 | `DEEP_BROWSE_ENABLED` | `false` | 启用深入浏览（智能模式） |
 | `DEEP_BROWSE_COUNT` | `3` | 深入浏览的页面数量（1-5） |
 | `DEEP_BROWSE_PAGE_CONTENT_LIMIT` | `5000` | 每页内容字符数限制 |
+| `MAX_FETCH_CONTENT_TOKENS` | `100000` | Web Fetch 内容最大 token 数 |
 
-**模式说明**：
+**工作模式说明**：
+- **按需拦截（推荐，默认）**：正常对话流程，仅当 AI 主动调用工具时才拦截执行
+- **自动触发模式**：检测到请求中包含 web_search/web_fetch 工具就立即执行（设置 `WEB_TOOLS_AUTO_TRIGGER=true`）
+
+**搜索模式说明**：
 - **简单模式（simple）**：直接返回搜索结果
 - **智能模式（smart）**：调用上游 LLM 分析搜索结果并生成总结
 - **深入浏览（Deep Browse）**：智能模式下，AI 自动选择重要页面深入抓取

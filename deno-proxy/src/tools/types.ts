@@ -129,6 +129,7 @@ export interface WebToolsConfig {
   enableSearchIntercept: boolean;
   enableFetchIntercept: boolean;
   searchMode: "simple" | "smart";
+  autoTrigger: boolean;                   // 是否自动触发（true=看到工具就执行，false=等AI调用）
   deepBrowseEnabled: boolean;             // 是否启用深入浏览
   deepBrowseCount: number;                // 深入浏览的页面数量（1-5）
   deepBrowsePageContentLimit: number;     // 深入浏览每个页面内容字符数限制

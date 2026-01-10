@@ -101,13 +101,14 @@ async function handleMessages(req: Request, requestId: string) {
     // 判断是否为流式请求：Anthropic 默认为非流式，仅当显式设为 true 时才流式
     const isStream = body.stream === true;
 
-    // 检查是否需要拦截 Web Search/Fetch 工具调用
+    // 检查是否需要拦截 Web Search/Fetch 工具调用（旧逻辑：自动触发模式）
     const shouldInterceptTools = ToolInterceptor.shouldIntercept(
       body.tools,
       config.webTools,
     );
 
-    if (shouldInterceptTools && config.firecrawl && config.webTools) {
+    // 只有在自动触发模式下才使用旧的提前拦截逻辑
+    if (shouldInterceptTools && config.firecrawl && config.webTools && config.webTools.autoTrigger) {
       // 在拦截前先解析渠道信息，以便智能模式使用
       let upstreamBaseUrl: string;
       let upstreamApiKey: string | undefined;

@@ -28,6 +28,7 @@ export interface WebToolsConfig {
   enableSearchIntercept: boolean;  // 是否启用 Web Search 拦截
   enableFetchIntercept: boolean;   // 是否启用 Web Fetch 拦截
   searchMode: "simple" | "smart";  // Web Search 工作模式
+  autoTrigger: boolean;            // 是否自动触发（true=看到工具就执行，false=等AI调用）
   deepBrowseEnabled: boolean;      // 是否启用深入浏览（智能模式）
   deepBrowseCount: number;         // 深入浏览的页面数量（1-5）
   deepBrowsePageContentLimit: number; // 深入浏览每个页面内容字符数限制（默认 5000）
@@ -249,6 +250,7 @@ export function loadConfig(): ProxyConfig {
       enableSearchIntercept,
       enableFetchIntercept,
       searchMode: (Deno.env.get("WEB_SEARCH_MODE") ?? "smart") as "simple" | "smart",
+      autoTrigger: Deno.env.get("WEB_TOOLS_AUTO_TRIGGER") !== "true", // 默认 false，等AI调用
       deepBrowseEnabled: Deno.env.get("DEEP_BROWSE_ENABLED") === "true",
       deepBrowseCount: Number(Deno.env.get("DEEP_BROWSE_COUNT") ?? "3"),
       deepBrowsePageContentLimit: Number(Deno.env.get("DEEP_BROWSE_PAGE_CONTENT_LIMIT") ?? "5000"),
