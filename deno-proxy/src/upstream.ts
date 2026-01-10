@@ -1,4 +1,4 @@
-import { ProxyConfig } from "./config.ts";
+import { ProxyConfig, resolveAutoTrigger } from "./config.ts";
 import { ClaudeRequest } from "./types.ts";
 import { SSEWriter } from "./sse.ts";
 import { log, logPhase, LogPhase } from "./logging.ts";
@@ -25,8 +25,15 @@ export async function forwardRequest(
   let requestModel: string;
   let protocol: "openai" | "anthropic";
 
-  // 解析模型名：支持 "channel+model" 格式
-  const modelName = request.model;
+  // 先解析模型名前缀（移除 cc+/chat+ 前缀）
+  const { actualModelName } = resolveAutoTrigger(
+    request.model,
+    config.channelConfigs,
+    config.webTools?.autoTrigger ?? true
+  );
+
+  // 解析模型名：支持 "channel+model" 格式（使用去除前缀后的模型名）
+  const modelName = actualModelName;
   const plusIndex = modelName.indexOf("+");
   
   if (plusIndex !== -1) {
