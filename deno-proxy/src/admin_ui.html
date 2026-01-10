@@ -577,6 +577,18 @@
             Tag: () => html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>`
         };
 
+        // 默认 WebTools 配置对象 - 避免在多处重复定义导致字段遗漏
+        const DEFAULT_WEB_TOOLS = {
+            enableSearchIntercept: false,
+            enableFetchIntercept: false,
+            searchMode: 'smart',
+            deepBrowseEnabled: false,
+            deepBrowseCount: 3,
+            deepBrowsePageContentLimit: 5000,
+            maxSearchResults: 10,
+            maxFetchContentTokens: 100000
+        };
+
         function App() {
             const [config, setConfig] = useState(null);
             const [loading, setLoading] = useState(false);
@@ -869,6 +881,169 @@
                                         </div>
                                     </div>
                                 `}
+                            </div>
+
+                            <div class="card">
+                                <h2><${Icons.Globe} /> Web Search & Fetch 配置</h2>
+
+                                <div class="section-title">Firecrawl API</div>
+                                <div class="grid-2">
+                                    <div class="form-group">
+                                        <label>API 密钥</label>
+                                        <input type="password"
+                                               placeholder="fc-..."
+                                               value=${config.firecrawl?.apiKey || ''}
+                                               onInput=${e => updateField('firecrawl', {
+                                                   ...(config.firecrawl || { baseUrl: 'https://api.firecrawl.dev/v2', timeout: 30000, maxRetries: 3, retryDelay: 1000 }),
+                                                   apiKey: e.target.value
+                                               })} />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>API Base URL</label>
+                                        <input type="text"
+                                               placeholder="https://api.firecrawl.dev/v2"
+                                               value=${config.firecrawl?.baseUrl || 'https://api.firecrawl.dev/v2'}
+                                               onInput=${e => updateField('firecrawl', {
+                                                   ...(config.firecrawl || { apiKey: '', timeout: 30000, maxRetries: 3, retryDelay: 1000 }),
+                                                   baseUrl: e.target.value
+                                               })} />
+                                    </div>
+                                </div>
+
+                                <div class="section-title">功能开关</div>
+                                <div class="form-group">
+                                    <label class="checkbox-group">
+                                        <input type="checkbox"
+                                               checked=${config.webTools?.enableSearchIntercept || false}
+                                               onChange=${e => updateField('webTools', {
+                                                   ...(config.webTools || DEFAULT_WEB_TOOLS),
+                                                   enableSearchIntercept: e.target.checked
+                                               })} />
+                                        <span>启用 Web Search 拦截</span>
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-group">
+                                        <input type="checkbox"
+                                               checked=${config.webTools?.enableFetchIntercept || false}
+                                               onChange=${e => updateField('webTools', {
+                                                   ...(config.webTools || DEFAULT_WEB_TOOLS),
+                                                   enableFetchIntercept: e.target.checked
+                                               })} />
+                                        <span>启用 Web Fetch 拦截</span>
+                                    </label>
+                                </div>
+
+                                <div class="section-title">工作模式</div>
+                                <div class="form-group">
+                                    <label>Web Search 模式</label>
+                                    <select value=${config.webTools?.searchMode || 'smart'}
+                                            onChange=${e => updateField('webTools', {
+                                                ...(config.webTools || DEFAULT_WEB_TOOLS),
+                                                searchMode: e.target.value
+                                            })}>
+                                        <option value="simple">简单模式</option>
+                                        <option value="smart">智能模式（推荐）</option>
+                                    </select>
+                                    <div class="helper-text">智能模式会调用 LLM 对搜索结果进行分析和总结</div>
+                                </div>
+
+                                <div class="section-title">深入浏览（智能模式）</div>
+                                <div class="form-group">
+                                    <label class="checkbox-group">
+                                        <input type="checkbox"
+                                               checked=${config.webTools?.deepBrowseEnabled || false}
+                                               onChange=${e => updateField('webTools', {
+                                                   ...(config.webTools || DEFAULT_WEB_TOOLS),
+                                                   deepBrowseEnabled: e.target.checked
+                                               })} />
+                                        <span>启用深入浏览</span>
+                                    </label>
+                                    <div class="helper-text">智能模式下，AI 会选择重要页面深入浏览并综合分析</div>
+                                </div>
+                                <div class="grid-2">
+                                    <div class="form-group">
+                                        <label>深入浏览页面数量</label>
+                                        <input type="number"
+                                               min="1"
+                                               max="5"
+                                               value=${config.webTools?.deepBrowseCount || 3}
+                                               onInput=${e => updateField('webTools', {
+                                                   ...(config.webTools || DEFAULT_WEB_TOOLS),
+                                                   deepBrowseCount: parseInt(e.target.value)
+                                               })} />
+                                        <div class="helper-text">AI 最多深入浏览的页面数量（1-5）</div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>每页内容长度限制 (字符)</label>
+                                        <input type="number"
+                                               min="1000"
+                                               max="50000"
+                                               step="1000"
+                                               value=${config.webTools?.deepBrowsePageContentLimit || 5000}
+                                               onInput=${e => updateField('webTools', {
+                                                   ...(config.webTools || DEFAULT_WEB_TOOLS),
+                                                   deepBrowsePageContentLimit: parseInt(e.target.value)
+                                               })} />
+                                        <div class="helper-text">深入浏览时每个页面内容的字符数限制</div>
+                                    </div>
+                                </div>
+
+                                <div class="section-title">性能与限制</div>
+                                <div class="grid-3">
+                                    <div class="form-group">
+                                        <label>请求超时 (ms)</label>
+                                        <input type="number"
+                                               value=${config.firecrawl?.timeout || 30000}
+                                               onInput=${e => updateField('firecrawl', {
+                                                   ...(config.firecrawl || { apiKey: '', baseUrl: 'https://api.firecrawl.dev/v2', maxRetries: 3, retryDelay: 1000 }),
+                                                   timeout: parseInt(e.target.value)
+                                               })} />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>最大重试次数</label>
+                                        <input type="number"
+                                               min="0"
+                                               max="10"
+                                               value=${config.firecrawl?.maxRetries || 3}
+                                               onInput=${e => updateField('firecrawl', {
+                                                   ...(config.firecrawl || { apiKey: '', baseUrl: 'https://api.firecrawl.dev/v2', timeout: 30000, retryDelay: 1000 }),
+                                                   maxRetries: parseInt(e.target.value)
+                                               })} />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>重试延迟 (ms)</label>
+                                        <input type="number"
+                                               value=${config.firecrawl?.retryDelay || 1000}
+                                               onInput=${e => updateField('firecrawl', {
+                                                   ...(config.firecrawl || { apiKey: '', baseUrl: 'https://api.firecrawl.dev/v2', timeout: 30000, maxRetries: 3 }),
+                                                   retryDelay: parseInt(e.target.value)
+                                               })} />
+                                    </div>
+                                </div>
+                                <div class="grid-2">
+                                    <div class="form-group">
+                                        <label>最大搜索结果数</label>
+                                        <input type="number"
+                                               min="1"
+                                               max="50"
+                                               value=${config.webTools?.maxSearchResults || 10}
+                                               onInput=${e => updateField('webTools', {
+                                                   ...(config.webTools || DEFAULT_WEB_TOOLS),
+                                                   maxSearchResults: parseInt(e.target.value)
+                                               })} />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>最大 Fetch Token 数</label>
+                                        <input type="number"
+                                               value=${config.webTools?.maxFetchContentTokens || 100000}
+                                               onInput=${e => updateField('webTools', {
+                                                   ...(config.webTools || DEFAULT_WEB_TOOLS),
+                                                   maxFetchContentTokens: parseInt(e.target.value)
+                                               })} />
+                                        <div class="helper-text">近似值，用于限制内容大小</div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="card">

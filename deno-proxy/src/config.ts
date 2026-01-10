@@ -16,6 +16,25 @@ export interface ToolCallRetryConfig {
   promptTemplate?: string;       // 自定义修正提示模板
 }
 
+export interface FirecrawlConfig {
+  apiKey: string;                // Firecrawl API 密钥
+  baseUrl: string;               // Firecrawl API 基础 URL
+  timeout: number;               // 请求超时时间（ms）
+  maxRetries: number;            // 最大重试次数
+  retryDelay: number;            // 重试延迟（ms）
+}
+
+export interface WebToolsConfig {
+  enableSearchIntercept: boolean;  // 是否启用 Web Search 拦截
+  enableFetchIntercept: boolean;   // 是否启用 Web Fetch 拦截
+  searchMode: "simple" | "smart";  // Web Search 工作模式
+  deepBrowseEnabled: boolean;      // 是否启用深入浏览（智能模式）
+  deepBrowseCount: number;         // 深入浏览的页面数量（1-5）
+  deepBrowsePageContentLimit: number; // 深入浏览每个页面内容字符数限制（默认 5000）
+  maxSearchResults: number;        // 最大搜索结果数量
+  maxFetchContentTokens: number;   // Web Fetch 内容最大 token 数
+}
+
 export interface ProxyConfig {
   port: number;
   host: string;
@@ -38,6 +57,10 @@ export interface ProxyConfig {
   configFilePath?: string;
   // 工具调用重试配置
   toolCallRetry?: ToolCallRetryConfig;
+  // Firecrawl 配置
+  firecrawl?: FirecrawlConfig;
+  // Web Search/Fetch 配置
+  webTools?: WebToolsConfig;
 }
 
 /**
@@ -189,7 +212,7 @@ export function loadConfig(): ProxyConfig {
   // 加载工具调用重试配置
   const toolCallRetryEnabled = Deno.env.get("TOOL_RETRY_ENABLED") === "true";
   let toolCallRetry: ToolCallRetryConfig | undefined;
-  
+
   if (toolCallRetryEnabled) {
     toolCallRetry = {
       enabled: true,
@@ -198,6 +221,39 @@ export function loadConfig(): ProxyConfig {
       strategy: 'correction',
       keepAlive: Deno.env.get("TOOL_RETRY_KEEP_ALIVE") !== "false", // 默认 true
       promptTemplate: Deno.env.get("TOOL_RETRY_PROMPT_TEMPLATE"),
+    };
+  }
+
+  // 加载 Firecrawl 配置
+  const firecrawlApiKey = Deno.env.get("FIRECRAWL_API_KEY");
+  let firecrawl: FirecrawlConfig | undefined;
+
+  if (firecrawlApiKey) {
+    firecrawl = {
+      apiKey: firecrawlApiKey,
+      baseUrl: Deno.env.get("FIRECRAWL_BASE_URL") ?? "https://api.firecrawl.dev/v2",
+      timeout: Number(Deno.env.get("FIRECRAWL_TIMEOUT") ?? "30000"),
+      maxRetries: Number(Deno.env.get("FIRECRAWL_MAX_RETRIES") ?? "3"),
+      retryDelay: Number(Deno.env.get("FIRECRAWL_RETRY_DELAY") ?? "1000"),
+    };
+  }
+
+  // 加载 Web Tools 配置
+  let webTools: WebToolsConfig | undefined;
+
+  const enableSearchIntercept = Deno.env.get("ENABLE_WEB_SEARCH_INTERCEPT") === "true";
+  const enableFetchIntercept = Deno.env.get("ENABLE_WEB_FETCH_INTERCEPT") === "true";
+
+  if (enableSearchIntercept || enableFetchIntercept) {
+    webTools = {
+      enableSearchIntercept,
+      enableFetchIntercept,
+      searchMode: (Deno.env.get("WEB_SEARCH_MODE") ?? "smart") as "simple" | "smart",
+      deepBrowseEnabled: Deno.env.get("DEEP_BROWSE_ENABLED") === "true",
+      deepBrowseCount: Number(Deno.env.get("DEEP_BROWSE_COUNT") ?? "3"),
+      deepBrowsePageContentLimit: Number(Deno.env.get("DEEP_BROWSE_PAGE_CONTENT_LIMIT") ?? "5000"),
+      maxSearchResults: Number(Deno.env.get("MAX_SEARCH_RESULTS") ?? "10"),
+      maxFetchContentTokens: Number(Deno.env.get("MAX_FETCH_CONTENT_TOKENS") ?? "100000"),
     };
   }
 
@@ -220,5 +276,7 @@ export function loadConfig(): ProxyConfig {
     pgStoreDsn,
     configFilePath,
     toolCallRetry,
+    firecrawl,
+    webTools,
   };
 }
