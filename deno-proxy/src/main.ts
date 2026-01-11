@@ -61,30 +61,11 @@ async function handleMessages(req: Request, requestId: string) {
   }
 
   let body: ClaudeRequest;
-  let channelName: string | undefined;
-  
+
   try {
     const rawBody = await req.text();
     body = JSON.parse(rawBody);
-    
-    // 解析渠道信息
-    const modelName = body.model;
-    const plusIndex = modelName.indexOf("+");
-    
-    if (plusIndex !== -1) {
-      channelName = modelName.slice(0, plusIndex);
-    } else if (config.channelConfigs.length > 0) {
-      channelName = config.channelConfigs[0].name;
-    }
-    
-    // 使用新的请求开始日志格式
-    logRequestStart(requestId, {
-      model: body.model,
-      tools: body.tools?.length,
-      stream: body.stream === true,
-      channel: channelName,
-    });
-    
+
     await logRequest(requestId, "debug", "Received Claude request body", {
       rawPreview: body,
     });
@@ -111,12 +92,21 @@ async function handleMessages(req: Request, requestId: string) {
       config.webTools,
     );
 
-    // 解析模型名并确定 autoTrigger 配置（考虑前缀、渠道、全局配置）
-    const { autoTrigger: resolvedAutoTrigger, actualModelName } = resolveAutoTrigger(
+    // 解析模型名并确定 autoTrigger 配置和渠道名（处理 cc+/chat+ 前缀）
+    const { autoTrigger: resolvedAutoTrigger, actualModelName, channelName } = resolveAutoTrigger(
       body.model,
       config.channelConfigs,
       config.webTools?.autoTrigger ?? true
     );
+
+    // 使用新的请求开始日志格式
+    logRequestStart(requestId, {
+      model: body.model,
+      tools: body.tools?.length,
+      stream: body.stream === true,
+      channel: channelName,
+      autoTrigger: resolvedAutoTrigger,
+    });
 
     // 只有在自动触发模式下才使用提前拦截逻辑
     if (shouldInterceptTools && config.firecrawl && config.webTools && resolvedAutoTrigger) {
