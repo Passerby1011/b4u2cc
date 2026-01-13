@@ -13,7 +13,11 @@ import type {
   SmartSearchInterceptResult,
   UpstreamInfo,
 } from "./types.ts";
-import type { ClaudeMessage } from "../types.ts";
+import type {
+  ClaudeMessage,
+  ClaudeTextBlock,
+  ClaudeContentBlock,
+} from "../types.ts";
 import { log } from "../logging.ts";
 import { AIClient, RequestContext, ContextBuilder } from "../ai_client/mod.ts";
 
@@ -554,23 +558,7 @@ export class ToolInterceptor {
     upstreamInfo: UpstreamInfo,
     requestId: string,
   ): RequestContext {
-    // 创建一个最小化的 RequestContext 用于辅助 AI 请求
-    const contextData = {
-      upstreamConfig: {
-        baseUrl: upstreamInfo.baseUrl,
-        apiKey: upstreamInfo.apiKey,
-        model: upstreamInfo.model,
-        protocol: upstreamInfo.protocol,
-      },
-      originalRequest: { messages: [], model: upstreamInfo.model, max_tokens: 4096 },
-      enrichedRequest: { messages: [], model: upstreamInfo.model, max_tokens: 4096 },
-      config: {} as any,
-      requestId,
-      requestFormat: "anthropic" as const,
-      toolCallMode: "auto" as const,
-    };
-
-    return new RequestContext(contextData);
+    return RequestContext.fromUpstreamInfo(upstreamInfo, requestId);
   }
 
   /**
@@ -640,7 +628,7 @@ Search query:`;
       });
 
       // 提取生成的搜索词
-      let generatedQuery = response.content?.trim() || "";
+      let generatedQuery = typeof response.content === "string" ? response.content.trim() : "";
 
       // 限制长度为 200 字符
       if (generatedQuery.length > 200) {
@@ -766,27 +754,29 @@ https://example.com/page2
 https://example.com/page3
 [/DEEP_BROWSE_LINKS]
 
-The URLs must be from the search results above.`;
+The URLs must be from the search results above.
+IMPORTANT: Do NOT call web_search again. The search has already been performed above.`;
     } else {
       // 普通模式：正常总结
-      analysisPrompt = `Based on the following search results for the query "${query}", please provide a comprehensive analysis and answer:\n\n${contentSummary}\n\nProvide a detailed, well-structured response that synthesizes the information from these search results.`;
+      analysisPrompt = `Based on the following search results for the query "${query}", please provide a comprehensive analysis and answer:\n\n${contentSummary}\n\nProvide a detailed, well-structured response that synthesizes the information from these search results.
+IMPORTANT: Do NOT call web_search again. The search has already been performed above.`;
     }
 
-    // 构建新的消息列表（只保留用户的原始问题，加上搜索结果作为上下文）
-    const analysisMessages = ContextBuilder.appendUserMessage(
-      originalMessages,
-      analysisPrompt,
-    );
+    // 提取用户原始问题
+    const userQuestion = this.extractUserQuestion(originalMessages);
+
+    // 构建清理后的消息列表（移除工具定义）
+    const cleanMessages = this.buildCleanMessages(originalMessages, userQuestion, analysisPrompt);
 
     // 使用 AIClient 发送请求
     const context = this.createContextFromUpstreamInfo(upstreamInfo, requestId);
     const client = new AIClient(context);
 
-    const response = await client.request(analysisMessages, {
+    const response = await client.request(cleanMessages, {
       max_tokens: 4096,
     });
 
-    const analysisText = response.content || "No analysis generated.";
+    const analysisText = typeof response.content === "string" ? response.content : "No analysis generated.";
 
     log("info", `✅ Initial analysis completed`, {
       requestId,
@@ -806,21 +796,21 @@ The URLs must be from the search results above.`;
     upstreamInfo: UpstreamInfo,
     requestId: string,
   ): Promise<string> {
-    // 构建新的消息列表
-    const analysisMessages = ContextBuilder.appendUserMessage(
-      originalMessages,
-      finalPrompt,
-    );
+    // 提取用户原始问题
+    const userQuestion = this.extractUserQuestion(originalMessages);
+
+    // 构建清理后的消息列表（移除工具定义）
+    const cleanMessages = this.buildCleanMessages(originalMessages, userQuestion, finalPrompt);
 
     // 使用 AIClient 发送请求
     const context = this.createContextFromUpstreamInfo(upstreamInfo, requestId);
     const client = new AIClient(context);
 
-    const response = await client.request(analysisMessages, {
+    const response = await client.request(cleanMessages, {
       max_tokens: 4096,
     });
 
-    return response.content || "No analysis generated.";
+    return typeof response.content === "string" ? response.content : "No analysis generated.";
   }
 
   /**
@@ -977,6 +967,7 @@ REQUIREMENTS:
 2. Choose the most valuable and relevant pages
 3. URLs MUST be from the search results above
 4. Output ONLY the URLs in the format below (no explanations, no additional text)
+5. Do NOT call web_search again. The search has already been performed above.
 
 [DEEP_BROWSE_LINKS]
 https://example.com/page1
@@ -984,22 +975,23 @@ https://example.com/page2
 https://example.com/page3
 [/DEEP_BROWSE_LINKS]`;
 
-    const analysisMessages = ContextBuilder.appendUserMessage(
-      messages,
-      prompt,
-    );
+    // 提取用户原始问题
+    const userQuestion = this.extractUserQuestion(messages);
+
+    // 构建清理后的消息列表（移除工具定义）
+    const cleanMessages = this.buildCleanMessages(messages, userQuestion, prompt);
 
     // 使用 AIClient 发送请求
     try {
       const context = this.createContextFromUpstreamInfo(upstreamInfo, requestId);
       const client = new AIClient(context);
 
-      const response = await client.request(analysisMessages, {
+      const response = await client.request(cleanMessages, {
         max_tokens: 500,
         temperature: 0.3,
       });
 
-      const responseText = response.content || "";
+      const responseText = typeof response.content === "string" ? response.content : "";
 
       log("info", `🤖 AI response for deep browse links`, {
         requestId,
@@ -1029,6 +1021,98 @@ https://example.com/page3
   }
 
   /**
+   * 从消息中提取用户原始问题（移除工具定义和 tool_use 消息）
+   * 用于内部 AI 请求，避免 AI 再次调用工具
+   */
+  private extractUserQuestion(messages: ClaudeMessage[]): string {
+    // 找到最后一条用户消息
+    const lastUserMessage = [...messages]
+      .reverse()
+      .find((msg) => msg.role === "user");
+
+    if (!lastUserMessage) {
+      return "";
+    }
+
+    // 提取文本内容
+    if (typeof lastUserMessage.content === "string") {
+      return lastUserMessage.content;
+    } else if (Array.isArray(lastUserMessage.content)) {
+      const textBlocks = lastUserMessage.content.filter((block) =>
+        "type" in block && block.type === "text"
+      );
+      return textBlocks.map((block) => "text" in block ? block.text : "").join(
+        " ",
+      );
+    }
+
+    return "";
+  }
+
+  /**
+   * 构建清理后的消息列表（保留完整对话上下文，只移除 tool_use 和工具定义）
+   * 用于内部 AI 请求，避免 AI 再次调用工具
+   */
+  private buildCleanMessages(
+    originalMessages: ClaudeMessage[],
+    userQuestion: string,
+    additionalPrompt: string,
+  ): ClaudeMessage[] {
+    const cleanMessages: ClaudeMessage[] = [];
+
+    for (const msg of originalMessages) {
+      // 只保留 user 和 assistant 角色的消息
+      if (msg.role !== "user" && msg.role !== "assistant") {
+        continue;
+      }
+
+      // 处理消息内容，过滤掉 tool_use 块
+      let cleanContent: string | ClaudeContentBlock[];
+      if (typeof msg.content === "string") {
+        // 纯文本内容，如果是最后一条用户消息，追加 additionalPrompt
+        if (msg.role === "user" && msg.content === userQuestion) {
+          cleanContent = `${msg.content}\n\n${additionalPrompt}`;
+        } else {
+          cleanContent = msg.content;
+        }
+      } else if (Array.isArray(msg.content)) {
+        // 数组内容，过滤掉 tool_use 块
+        const filteredBlocks = msg.content.filter((block) =>
+          !("type" in block && block.type === "tool_use")
+        );
+
+        // 如果是最后一条用户消息，追加 additionalPrompt
+        if (msg.role === "user" && filteredBlocks.some(b => "type" in b && b.type === "text")) {
+          const textBlocks = filteredBlocks.filter((b): b is ClaudeTextBlock =>
+            "type" in b && b.type === "text"
+          );
+          if (textBlocks.length > 0) {
+            const lastTextIndex = filteredBlocks.findIndex(b => "type" in b && b.type === "text");
+            filteredBlocks[lastTextIndex] = {
+              ...textBlocks[0],
+              text: `${textBlocks[0].text}\n\n${additionalPrompt}`
+            };
+          }
+        }
+        cleanContent = filteredBlocks;
+      } else {
+        cleanContent = msg.content;
+      }
+
+      // 只有非空内容才添加
+      if (cleanContent &&
+          (typeof cleanContent === "string" ? cleanContent.length > 0 : cleanContent.length > 0)) {
+        cleanMessages.push({
+          role: msg.role,
+          content: cleanContent,
+        });
+      }
+    }
+
+    return cleanMessages;
+  }
+
+  /**
    * 流式调用上游 API 进行分析（普通模式）
    */
   private async streamUpstreamAnalysis(
@@ -1039,11 +1123,20 @@ https://example.com/page3
     requestId: string,
     onStreamChunk: (text: string) => Promise<void>,
   ): Promise<void> {
-    const prompt = `Based on the following search results for the query "${query}", please provide a comprehensive analysis and answer:\n\n${searchSummary}\n\nProvide a detailed, well-structured response that synthesizes the information from these search results.`;
+    // 构建分析提示词
+    const prompt = `Based on the following search results for the query "${query}", please provide a comprehensive analysis and answer:
 
-    const analysisMessages = ContextBuilder.appendUserMessage(messages, prompt);
+${searchSummary}
 
-    await this.streamFromUpstream(analysisMessages, upstreamInfo, requestId, onStreamChunk);
+IMPORTANT: Do NOT call web_search again. The search has already been performed above. Simply analyze the search results and provide a direct answer.`;
+
+    // 提取用户原始问题
+    const userQuestion = this.extractUserQuestion(messages);
+
+    // 构建清理后的消息列表（移除工具定义）
+    const cleanMessages = this.buildCleanMessages(messages, userQuestion, prompt);
+
+    await this.streamFromUpstream(cleanMessages, upstreamInfo, requestId, onStreamChunk);
   }
 
   /**
@@ -1056,9 +1149,13 @@ https://example.com/page3
     requestId: string,
     onStreamChunk: (text: string) => Promise<void>,
   ): Promise<void> {
-    const analysisMessages = ContextBuilder.appendUserMessage(messages, finalPrompt);
+    // 提取用户原始问题
+    const userQuestion = this.extractUserQuestion(messages);
 
-    await this.streamFromUpstream(analysisMessages, upstreamInfo, requestId, onStreamChunk);
+    // 构建清理后的消息列表（移除工具定义）
+    const cleanMessages = this.buildCleanMessages(messages, userQuestion, finalPrompt);
+
+    await this.streamFromUpstream(cleanMessages, upstreamInfo, requestId, onStreamChunk);
   }
 
   /**

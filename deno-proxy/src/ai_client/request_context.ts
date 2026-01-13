@@ -87,6 +87,63 @@ export class RequestContext {
   }
 
   /**
+   * 静态工厂方法：从 UpstreamInfo 创建 RequestContext（用于工具拦截器中的辅助 AI 请求）
+   *
+   * @param upstreamInfo 上游配置信息
+   * @param requestId 请求 ID
+   * @returns RequestContext 实例
+   */
+  static fromUpstreamInfo(
+    upstreamInfo: { baseUrl: string; apiKey?: string; model: string; protocol: Protocol },
+    requestId: string,
+  ): RequestContext {
+    // 创建一个最小化的 RequestContext 用于工具拦截器中的辅助 AI 请求
+    const upstreamConfig: UpstreamConfig = {
+      baseUrl: upstreamInfo.baseUrl,
+      apiKey: upstreamInfo.apiKey,
+      model: upstreamInfo.model,
+      protocol: upstreamInfo.protocol,
+    };
+
+    // 创建最小化的请求对象
+    const minimalRequest: ClaudeRequest = {
+      model: upstreamInfo.model,
+      max_tokens: 4096,
+      messages: [],
+    };
+
+    // 创建最小化的配置对象（确保 defaultProtocol 类型正确）
+    const protocol = upstreamInfo.protocol === "gemini" ? "openai" : upstreamInfo.protocol;
+    const minimalConfig: ProxyConfig = {
+      upstreamBaseUrl: upstreamInfo.baseUrl,
+      upstreamApiKey: upstreamInfo.apiKey,
+      upstreamModelOverride: upstreamInfo.model,
+      channelConfigs: [],
+      defaultProtocol: protocol as "openai" | "anthropic",
+      port: 0, // 占位值
+      host: "0.0.0.0",
+      requestTimeoutMs: 120000,
+      aggregationIntervalMs: 35,
+      maxRequestsPerMinute: 10,
+      tokenMultiplier: 1.0,
+      autoPort: false,
+      passthroughApiKey: false,
+    };
+
+    const contextData: RequestContextData = {
+      upstreamConfig,
+      originalRequest: minimalRequest,
+      enrichedRequest: minimalRequest,
+      config: minimalConfig,
+      requestId,
+      requestFormat: "anthropic",
+      toolCallMode: "prompt_injection",
+    };
+
+    return new RequestContext(contextData);
+  }
+
+  /**
    * 解析渠道信息
    *
    * 处理 channel+model 格式，查找渠道配置，应用透传逻辑

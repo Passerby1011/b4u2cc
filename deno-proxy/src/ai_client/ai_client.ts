@@ -158,18 +158,79 @@ export class AIClient {
       const decoder = new TextDecoder();
       let buffer = "";
 
+      // For Anthropic SSE: temporarily store event type
+      let pendingEventType: string | null = null;
+
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
+
+          // Split lines, handle LF and CRLF
+          const lines = buffer.split(/\r?\n/);
+          buffer = lines.pop() || ""; // Keep last line (may be incomplete)
 
           for (const line of lines) {
-            const chunk = this.protocolAdapter.parseStreamChunk(line);
+            const trimmed = line.trim();
+            if (!trimmed) continue;
 
+            // Anthropic format: event: xxx\ndata: yyy
+            // Detect event: line
+            if (trimmed.startsWith("event: ")) {
+              pendingEventType = trimmed.slice(7).trim();
+              continue;
+            }
+
+            // Detect data: line
+            if (trimmed.startsWith("data: ")) {
+              const dataStr = trimmed.slice(6);
+
+              // Stream end marker
+              if (dataStr === "[DONE]") {
+                const chunk = this.protocolAdapter.parseStreamChunk("data: [DONE]");
+                if (chunk) {
+                  await onChunk(chunk);
+                }
+                return;
+              }
+
+              // If there's a pending event type, inject it into the data line
+              let parseLine = trimmed;
+              if (pendingEventType) {
+                // Inject event type into JSON
+                try {
+                  const data = JSON.parse(dataStr);
+                  data.type = pendingEventType;
+                  parseLine = "data: " + JSON.stringify(data);
+                } catch {
+                  // JSON parse failed, use original line
+                }
+                pendingEventType = null;
+              }
+
+              const chunk = this.protocolAdapter.parseStreamChunk(parseLine);
+
+              if (chunk) {
+                totalChunks++;
+
+                if (chunk.text) {
+                  totalOutputLength += chunk.text.length;
+                }
+
+                await onChunk(chunk);
+
+                // Stream end
+                if (chunk.type === "done") {
+                  return;
+                }
+              }
+              continue;
+            }
+
+            // Non-data line, try to parse directly
+            const chunk = this.protocolAdapter.parseStreamChunk(trimmed);
             if (chunk) {
               totalChunks++;
 
@@ -179,9 +240,8 @@ export class AIClient {
 
               await onChunk(chunk);
 
-              // 流结束
               if (chunk.type === "done") {
-                break;
+                return;
               }
             }
           }

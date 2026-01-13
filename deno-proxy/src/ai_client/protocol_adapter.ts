@@ -63,11 +63,19 @@ export class OpenAIAdapter implements ProtocolAdapter {
   buildRequestBody(messages: ClaudeMessage[], options: AIRequestOptions): string {
     // 转换消息格式：Claude -> OpenAI
     const openaiMessages: OpenAIChatMessage[] = messages.map((msg) => ({
-      role: msg.role as "user" | "assistant",
+      role: msg.role as "user" | "assistant" | "system",
       content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content),
     }));
 
-    const requestBody = {
+    // 🔑 处理 system prompt：如果 metadata 中包含 system，则将其作为 system 消息插入到头部
+    if (options.metadata?.system) {
+      openaiMessages.unshift({
+        role: "system",
+        content: options.metadata.system,
+      });
+    }
+
+    const requestBody: any = {
       model: options.metadata?.model || "gpt-4",
       messages: openaiMessages,
       stream: options.stream ?? false,
@@ -153,7 +161,7 @@ export class OpenAIAdapter implements ProtocolAdapter {
  */
 export class AnthropicAdapter implements ProtocolAdapter {
   buildRequestBody(messages: ClaudeMessage[], options: AIRequestOptions): string {
-    const requestBody = {
+    const requestBody: any = {
       model: options.metadata?.model || "claude-3-5-sonnet-20241022",
       messages: messages,
       stream: options.stream ?? false,

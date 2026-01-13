@@ -9,18 +9,18 @@ export { RequestContext } from "./request_context.ts";
 export { AIClient } from "./ai_client.ts";
 export { ContextBuilder } from "./context_builder.ts";
 
-// 协议适配器
+// 协议适配器（ProtocolAdapter 是 interface，需要用 type 导出）
+export type { ProtocolAdapter } from "./protocol_adapter.ts";
 export {
-  ProtocolAdapter,
   OpenAIAdapter,
   AnthropicAdapter,
   GeminiAdapter,
   ProtocolAdapterFactory,
 } from "./protocol_adapter.ts";
 
-// 工具调用策略
+// 工具调用策略（ToolCallStrategy 是 interface，需要用 type 导出）
+export type { ToolCallStrategy } from "./tool_call_strategy.ts";
 export {
-  ToolCallStrategy,
   PromptInjectionStrategy,
   NativeToolCallStrategy,
   AutoStrategy,
