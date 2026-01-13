@@ -3,15 +3,11 @@ import { ToolCallDelimiter } from "./signals.ts";
 import { ParsedInvokeCall, ClaudeRequest } from "./types.ts";
 import { ProxyConfig } from "./config.ts";
 import { ToolifyParser } from "./parser.ts";
+import { RequestContext, ContextBuilder } from "./ai_client/mod.ts";
 
 export class ToolCallRetryHandler {
   constructor(
-    private config: ProxyConfig,
-    private requestId: string,
-    private originalRequest: ClaudeRequest,
-    private upstreamUrl: string,
-    private upstreamHeaders: Record<string, string>,
-    private protocol: "openai" | "anthropic",
+    private context: RequestContext, // 使用 RequestContext 替代多个参数
   ) {}
 
   async retry(
@@ -25,18 +21,23 @@ export class ToolCallRetryHandler {
     error?: string;
     duration?: number;
   }> {
+    const requestId = this.context.getRequestId();
+    const config = this.context.getConfig();
+    const upstreamConfig = this.context.getUpstreamConfig();
+    const originalRequest = this.context.getOriginalRequest();
+
     const startTime = Date.now();
-    
-    // 🔑 日志：重试开始
+
+    // 日志：重试开始
     log("warn", "Tool call parse failed, initiating retry", {
-      requestId: this.requestId,
+      requestId,
       attemptCount,
-      maxRetries: this.config.toolCallRetry?.maxRetries || 1,
+      maxRetries: config.toolCallRetry?.maxRetries || 1,
       failedContentPreview: failedContent.slice(0, 200),
       priorTextLength: priorText.length,
       strategy: "correction"
     });
-    logPhase(this.requestId, LogPhase.RETRY, `Attempt ${attemptCount}`, {
+    logPhase(requestId, LogPhase.RETRY, `Attempt ${attemptCount}`, {
       priorTextPreview: priorText.slice(0, 100)
     });
 
@@ -47,37 +48,50 @@ export class ToolCallRetryHandler {
       delimiter
     );
 
-    // 🔑 构造重试请求（包含之前的完整输出）
-    const retryMessages = [
-      ...this.originalRequest.messages,
-      {
-        role: "assistant" as const,
-        content: priorText + failedContent  // 完整的失败输出
-      },
-      {
-        role: "user" as const,
-        content: correctionPrompt
-      }
-    ];
+    // 使用 ContextBuilder 构建重试上下文
+    const retryMessages = ContextBuilder.buildRetryContext(
+      originalRequest.messages,
+      failedContent,
+      priorText,
+      correctionPrompt
+    );
 
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(
         () => controller.abort(),
-        this.config.toolCallRetry?.timeout || 30000
+        config.toolCallRetry?.timeout || 30000
       );
 
       log("debug", "Sending retry request to upstream", {
-        requestId: this.requestId,
+        requestId,
         messageCount: retryMessages.length,
-        url: this.upstreamUrl
+        url: upstreamConfig.baseUrl
       });
 
-      const requestBody = this.buildRequestBody(retryMessages);
+      // 构建请求体（根据协议）
+      const protocol = upstreamConfig.protocol;
+      const requestBody = this.buildRequestBody(retryMessages, protocol as "openai" | "anthropic");
 
-      const response = await fetch(this.upstreamUrl, {
+      // 构建请求头
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      if (protocol === "openai") {
+        if (upstreamConfig.apiKey) {
+          headers["Authorization"] = `Bearer ${upstreamConfig.apiKey}`;
+        }
+      } else {
+        if (upstreamConfig.apiKey) {
+          headers["x-api-key"] = upstreamConfig.apiKey;
+        }
+        headers["anthropic-version"] = "2023-06-01";
+      }
+
+      const response = await fetch(upstreamConfig.baseUrl, {
         method: "POST",
-        headers: this.upstreamHeaders,
+        headers,
         body: JSON.stringify(requestBody),
         signal: controller.signal
       });
@@ -87,7 +101,7 @@ export class ToolCallRetryHandler {
         const duration = Date.now() - startTime;
         const errorText = await response.text();
         log("error", "Retry request failed", {
-          requestId: this.requestId,
+          requestId,
           status: response.status,
           error: errorText.slice(0, 500)
         });
@@ -99,7 +113,7 @@ export class ToolCallRetryHandler {
       // 🔑 改用流式处理重试响应
       const reader = response.body?.getReader();
       if (!reader) {
-        log("error", "No response body reader", { requestId: this.requestId });
+        log("error", "No response body reader", { requestId });
         return { success: false, error: "No response body", duration: Date.now() - startTime };
       }
 
@@ -121,7 +135,7 @@ export class ToolCallRetryHandler {
             const trimmed = line.trim();
             if (!trimmed) continue;
 
-            if (this.protocol === "openai") {
+            if (protocol === "openai") {
               // OpenAI SSE 格式
               if (!trimmed.startsWith("data: ")) continue;
               const jsonStr = trimmed.slice(6);
@@ -163,7 +177,7 @@ export class ToolCallRetryHandler {
 
       if (!fullContent) {
         log("warn", "Empty retry response", {
-          requestId: this.requestId
+          requestId
         });
         return { success: false, error: "Empty response", duration };
       }
@@ -174,19 +188,19 @@ export class ToolCallRetryHandler {
       if (toolCall) {
         // 🔑 日志：重试成功
         log("info", "Tool call retry succeeded", {
-          requestId: this.requestId,
+          requestId,
           attemptCount,
           toolName: toolCall.name,
           duration: `${duration}ms`
         });
-        logPhase(this.requestId, LogPhase.RETRY_SUCCESS, toolCall.name, {
+        logPhase(requestId, LogPhase.RETRY_SUCCESS, toolCall.name, {
           duration: `${(duration / 1000).toFixed(2)}s`
         });
         return { success: true, result: toolCall, duration };
       } else {
         // 🔑 日志：重试响应仍然无效
         log("warn", "Retry response still invalid", {
-          requestId: this.requestId,
+          requestId,
           attemptCount,
           responsePreview: fullContent.slice(0, 300)
         });
@@ -199,12 +213,12 @@ export class ToolCallRetryHandler {
       
       // 🔑 日志：重试异常
       log("error", "Retry request exception", {
-        requestId: this.requestId,
+        requestId,
         attemptCount,
         error: errorMsg,
         duration: `${duration}ms`
       });
-      logPhase(this.requestId, LogPhase.RETRY_FAILED, "Exception", {
+      logPhase(requestId, LogPhase.RETRY_FAILED, "Exception", {
         error: errorMsg
       });
       return { success: false, error: errorMsg, duration };
@@ -220,10 +234,11 @@ export class ToolCallRetryHandler {
     delimiter: ToolCallDelimiter
   ): string {
     const m = delimiter.getMarkers();
-    
+    const config = this.context.getConfig();
+
     // 使用自定义模板
-    if (this.config.toolCallRetry?.promptTemplate) {
-      return this.config.toolCallRetry.promptTemplate
+    if (config.toolCallRetry?.promptTemplate) {
+      return config.toolCallRetry.promptTemplate
         .replace(/\{failedContent\}/g, failedContent)
         .replace(/\{priorText\}/g, priorText)
         .replace(/\{TC_START\}/g, m.TC_START)
@@ -264,34 +279,32 @@ Critical requirements:
 Your response should contain ONLY the tool call block, nothing else.`;
   }
 
-  private buildRequestBody(messages: any[]): any {
-    // 🔑 解析模型名：支持 "channel+model" 格式，重试时应使用实际模型名
-    const modelName = this.originalRequest.model;
-    const plusIndex = modelName.indexOf("+");
-    const actualModel = plusIndex !== -1 ? modelName.slice(plusIndex + 1) : modelName;
+  private buildRequestBody(messages: any[], protocol: "openai" | "anthropic"): any {
+    const originalRequest = this.context.getOriginalRequest();
+    const upstreamConfig = this.context.getUpstreamConfig();
 
-    // 🔑 使用实际的模型和协议，改用流式
-    if (this.protocol === "anthropic") {
+    // 使用实际的模型和协议
+    if (protocol === "anthropic") {
       // Anthropic 格式
       return {
-        model: actualModel,
-        max_tokens: this.originalRequest.max_tokens || 4096,
+        model: upstreamConfig.model,
+        max_tokens: originalRequest.max_tokens || 4096,
         messages,
         stream: true,
-        system: this.originalRequest.system,
-        temperature: this.originalRequest.temperature,
-        top_p: this.originalRequest.top_p,
-        thinking: this.originalRequest.thinking,
+        system: originalRequest.system,
+        temperature: originalRequest.temperature,
+        top_p: originalRequest.top_p,
+        thinking: originalRequest.thinking,
       };
     } else {
       // OpenAI 格式
       return {
-        model: actualModel,
+        model: upstreamConfig.model,
         messages,
         stream: true,
-        max_tokens: this.originalRequest.max_tokens || 4096,
-        temperature: this.originalRequest.temperature,
-        top_p: this.originalRequest.top_p,
+        max_tokens: originalRequest.max_tokens || 4096,
+        temperature: originalRequest.temperature,
+        top_p: originalRequest.top_p,
       };
     }
   }
@@ -318,17 +331,17 @@ Your response should contain ONLY the tool call block, nothing else.`;
       const argsStr = match[2].trim();
       
       // 🔑 使用统一的 ToolifyParser 修复逻辑来解析重试结果
-      const parser = new ToolifyParser(delimiter, false, this.requestId);
+      const parser = new ToolifyParser(delimiter, false, requestId);
       // 利用 parser 内部的 tryParseJson (它是私有的，但我们可以通过这种方式间接复用逻辑，
       // 或者干脆把 tryParseJson 改为静态方法/导出函数)
       // 为保持最简改动，我们临时将 parser.ts 的 tryParseJson 改为 public
       const args = (parser as any).tryParseJson(argsStr);
-      
+
       if (args !== null) {
         return { name, arguments: args };
       } else {
         log("warn", "Failed to parse retry tool call JSON even after repair", {
-          requestId: this.requestId,
+          requestId,
           argsStr: argsStr.slice(0, 200)
         });
         return null;

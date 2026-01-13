@@ -15,6 +15,7 @@ import type {
 } from "./types.ts";
 import type { ClaudeMessage } from "../types.ts";
 import { log } from "../logging.ts";
+import { AIClient, RequestContext, ContextBuilder } from "../ai_client/mod.ts";
 
 /**
  * 工具拦截器
@@ -547,6 +548,32 @@ export class ToolInterceptor {
   }
 
   /**
+   * 从 UpstreamInfo 创建临时 RequestContext 用于辅助 AI 请求
+   */
+  private createContextFromUpstreamInfo(
+    upstreamInfo: UpstreamInfo,
+    requestId: string,
+  ): RequestContext {
+    // 创建一个最小化的 RequestContext 用于辅助 AI 请求
+    const contextData = {
+      upstreamConfig: {
+        baseUrl: upstreamInfo.baseUrl,
+        apiKey: upstreamInfo.apiKey,
+        model: upstreamInfo.model,
+        protocol: upstreamInfo.protocol,
+      },
+      originalRequest: { messages: [], model: upstreamInfo.model, max_tokens: 4096 },
+      enrichedRequest: { messages: [], model: upstreamInfo.model, max_tokens: 4096 },
+      config: {} as any,
+      requestId,
+      requestFormat: "anthropic" as const,
+      toolCallMode: "auto" as const,
+    };
+
+    return new RequestContext(contextData);
+  }
+
+  /**
    * 从消息中提取搜索查询
    * 使用上游 AI 生成精确的搜索词
    */
@@ -602,84 +629,18 @@ Search query:`;
       },
     ];
 
-    // 根据协议类型构建请求
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-
-    let fetchBody: string;
-    const finalUrl = upstreamInfo.baseUrl;
-
-    if (upstreamInfo.protocol === "openai") {
-      // OpenAI 格式
-      const openaiMessages = queryMessages.map((msg) => ({
-        role: msg.role,
-        content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content),
-      }));
-
-      const openaiReq = {
-        model: upstreamInfo.model,
-        messages: openaiMessages,
-        stream: false,
-        max_tokens: 100,
-        temperature: 0.3,
-      };
-
-      fetchBody = JSON.stringify(openaiReq);
-      if (upstreamInfo.apiKey) {
-        headers["Authorization"] = `Bearer ${upstreamInfo.apiKey}`;
-      }
-    } else {
-      // Anthropic 格式
-      const anthropicReq = {
-        model: upstreamInfo.model,
-        messages: queryMessages,
-        stream: false,
-        max_tokens: 100,
-        temperature: 0.3,
-      };
-
-      fetchBody = JSON.stringify(anthropicReq);
-      if (upstreamInfo.apiKey) {
-        headers["x-api-key"] = upstreamInfo.apiKey;
-      }
-      headers["anthropic-version"] = "2023-06-01";
-    }
-
-    // 调用上游 API
+    // 使用 AIClient 发送请求
     try {
-      const response = await fetch(finalUrl, {
-        method: "POST",
-        headers,
-        body: fetchBody,
+      const context = this.createContextFromUpstreamInfo(upstreamInfo, requestId);
+      const client = new AIClient(context);
+
+      const response = await client.request(queryMessages, {
+        max_tokens: 100,
+        temperature: 0.3,
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        log("warn", `Search query generation failed (${response.status}), using fallback`, {
-          requestId,
-          error: errorText.slice(0, 200),
-        });
-        // 失败时使用简单的后备方案
-        return this.fallbackExtractQuery(userQuestion);
-      }
-
-      const json = await response.json();
-
-      // 从响应中提取搜索词
-      let generatedQuery = "";
-      if (upstreamInfo.protocol === "openai") {
-        // OpenAI 响应格式
-        const message = json.choices?.[0]?.message;
-        generatedQuery = message?.content?.trim() || "";
-      } else {
-        // Anthropic 响应格式
-        const content = json.content;
-        if (Array.isArray(content)) {
-          const textBlocks = content.filter((block: any) => block.type === "text");
-          generatedQuery = textBlocks.map((block: any) => block.text).join(" ").trim();
-        }
-      }
+      // 提取生成的搜索词
+      let generatedQuery = response.content?.trim() || "";
 
       // 限制长度为 200 字符
       if (generatedQuery.length > 200) {
@@ -812,90 +773,20 @@ The URLs must be from the search results above.`;
     }
 
     // 构建新的消息列表（只保留用户的原始问题，加上搜索结果作为上下文）
-    const analysisMessages: ClaudeMessage[] = [
-      ...originalMessages,
-      {
-        role: "user",
-        content: analysisPrompt,
-      },
-    ];
+    const analysisMessages = ContextBuilder.appendUserMessage(
+      originalMessages,
+      analysisPrompt,
+    );
 
-    // 根据协议类型构建请求
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+    // 使用 AIClient 发送请求
+    const context = this.createContextFromUpstreamInfo(upstreamInfo, requestId);
+    const client = new AIClient(context);
 
-    let fetchBody: string;
-    const finalUrl = upstreamInfo.baseUrl;
-
-    if (upstreamInfo.protocol === "openai") {
-      // OpenAI 格式
-      const openaiMessages = analysisMessages.map((msg) => ({
-        role: msg.role,
-        content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content),
-      }));
-
-      const openaiReq = {
-        model: upstreamInfo.model,
-        messages: openaiMessages,
-        stream: false,
-        max_tokens: 4096,
-      };
-
-      fetchBody = JSON.stringify(openaiReq);
-      if (upstreamInfo.apiKey) {
-        headers["Authorization"] = `Bearer ${upstreamInfo.apiKey}`;
-      }
-    } else {
-      // Anthropic 格式
-      const anthropicReq = {
-        model: upstreamInfo.model,
-        messages: analysisMessages,
-        stream: false,
-        max_tokens: 4096,
-      };
-
-      fetchBody = JSON.stringify(anthropicReq);
-      if (upstreamInfo.apiKey) {
-        headers["x-api-key"] = upstreamInfo.apiKey;
-      }
-      headers["anthropic-version"] = "2023-06-01";
-    }
-
-    // 调用上游 API
-    const response = await fetch(finalUrl, {
-      method: "POST",
-      headers,
-      body: fetchBody,
+    const response = await client.request(analysisMessages, {
+      max_tokens: 4096,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      log("error", `Upstream analysis failed (${response.status})`, {
-        requestId,
-        error: errorText.slice(0, 200),
-      });
-      throw new Error(`Upstream analysis failed: ${response.status}`);
-    }
-
-    const json = await response.json();
-
-    // 从响应中提取文本
-    let analysisText = "";
-    if (upstreamInfo.protocol === "openai") {
-      // OpenAI 响应格式
-      const message = json.choices?.[0]?.message;
-      analysisText = message?.content || "No analysis generated.";
-    } else {
-      // Anthropic 响应格式
-      const content = json.content;
-      if (Array.isArray(content)) {
-        const textBlocks = content.filter((block: any) => block.type === "text");
-        analysisText = textBlocks.map((block: any) => block.text).join("\n") || "No analysis generated.";
-      } else {
-        analysisText = "No analysis generated.";
-      }
-    }
+    const analysisText = response.content || "No analysis generated.";
 
     log("info", `✅ Initial analysis completed`, {
       requestId,
@@ -916,92 +807,20 @@ The URLs must be from the search results above.`;
     requestId: string,
   ): Promise<string> {
     // 构建新的消息列表
-    const analysisMessages: ClaudeMessage[] = [
-      ...originalMessages,
-      {
-        role: "user",
-        content: finalPrompt,
-      },
-    ];
+    const analysisMessages = ContextBuilder.appendUserMessage(
+      originalMessages,
+      finalPrompt,
+    );
 
-    // 根据协议类型构建请求
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+    // 使用 AIClient 发送请求
+    const context = this.createContextFromUpstreamInfo(upstreamInfo, requestId);
+    const client = new AIClient(context);
 
-    let fetchBody: string;
-    const finalUrl = upstreamInfo.baseUrl;
-
-    if (upstreamInfo.protocol === "openai") {
-      // OpenAI 格式
-      const openaiMessages = analysisMessages.map((msg) => ({
-        role: msg.role,
-        content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content),
-      }));
-
-      const openaiReq = {
-        model: upstreamInfo.model,
-        messages: openaiMessages,
-        stream: false,
-        max_tokens: 4096,
-      };
-
-      fetchBody = JSON.stringify(openaiReq);
-      if (upstreamInfo.apiKey) {
-        headers["Authorization"] = `Bearer ${upstreamInfo.apiKey}`;
-      }
-    } else {
-      // Anthropic 格式
-      const anthropicReq = {
-        model: upstreamInfo.model,
-        messages: analysisMessages,
-        stream: false,
-        max_tokens: 4096,
-      };
-
-      fetchBody = JSON.stringify(anthropicReq);
-      if (upstreamInfo.apiKey) {
-        headers["x-api-key"] = upstreamInfo.apiKey;
-      }
-      headers["anthropic-version"] = "2023-06-01";
-    }
-
-    // 调用上游 API
-    const response = await fetch(finalUrl, {
-      method: "POST",
-      headers,
-      body: fetchBody,
+    const response = await client.request(analysisMessages, {
+      max_tokens: 4096,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      log("error", `Final analysis failed (${response.status})`, {
-        requestId,
-        error: errorText.slice(0, 200),
-      });
-      throw new Error(`Final analysis failed: ${response.status}`);
-    }
-
-    const json = await response.json();
-
-    // 从响应中提取文本
-    let analysisText = "";
-    if (upstreamInfo.protocol === "openai") {
-      // OpenAI 响应格式
-      const message = json.choices?.[0]?.message;
-      analysisText = message?.content || "No analysis generated.";
-    } else {
-      // Anthropic 响应格式
-      const content = json.content;
-      if (Array.isArray(content)) {
-        const textBlocks = content.filter((block: any) => block.type === "text");
-        analysisText = textBlocks.map((block: any) => block.text).join("\n") || "No analysis generated.";
-      } else {
-        analysisText = "No analysis generated.";
-      }
-    }
-
-    return analysisText;
+    return response.content || "No analysis generated.";
   }
 
   /**
@@ -1165,101 +984,48 @@ https://example.com/page2
 https://example.com/page3
 [/DEEP_BROWSE_LINKS]`;
 
-    const analysisMessages: ClaudeMessage[] = [
-      ...messages,
-      {
-        role: "user",
-        content: prompt,
-      },
-    ];
+    const analysisMessages = ContextBuilder.appendUserMessage(
+      messages,
+      prompt,
+    );
 
-    // 构建请求
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+    // 使用 AIClient 发送请求
+    try {
+      const context = this.createContextFromUpstreamInfo(upstreamInfo, requestId);
+      const client = new AIClient(context);
 
-    let fetchBody: string;
-    const finalUrl = upstreamInfo.baseUrl;
-
-    if (upstreamInfo.protocol === "openai") {
-      const openaiMessages = analysisMessages.map((msg) => ({
-        role: msg.role,
-        content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content),
-      }));
-
-      fetchBody = JSON.stringify({
-        model: upstreamInfo.model,
-        messages: openaiMessages,
-        stream: false,
+      const response = await client.request(analysisMessages, {
         max_tokens: 500,
         temperature: 0.3,
       });
 
-      if (upstreamInfo.apiKey) {
-        headers["Authorization"] = `Bearer ${upstreamInfo.apiKey}`;
-      }
-    } else {
-      fetchBody = JSON.stringify({
-        model: upstreamInfo.model,
-        messages: analysisMessages,
-        stream: false,
-        max_tokens: 500,
-        temperature: 0.3,
-      });
+      const responseText = response.content || "";
 
-      if (upstreamInfo.apiKey) {
-        headers["x-api-key"] = upstreamInfo.apiKey;
-      }
-      headers["anthropic-version"] = "2023-06-01";
-    }
-
-    const response = await fetch(finalUrl, {
-      method: "POST",
-      headers,
-      body: fetchBody,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      log("warn", `Failed to get deep browse links (${response.status})`, {
+      log("info", `🤖 AI response for deep browse links`, {
         requestId,
-        error: errorText.slice(0, 200),
+        requestedCount: count,
+        responseLength: responseText.length,
+        responsePreview: responseText.substring(0, 500),
+      });
+
+      // 提取链接
+      const links = this.extractDeepBrowseLinks(responseText);
+
+      log("info", `🔗 Got deep browse links`, {
+        requestId,
+        requestedCount: count,
+        extractedCount: links.length,
+        links: links.map(l => l.substring(0, 100)),
+      });
+
+      return links;
+    } catch (error) {
+      log("warn", `Failed to get deep browse links`, {
+        requestId,
+        error: String(error),
       });
       return [];
     }
-
-    const json = await response.json();
-
-    let responseText = "";
-    if (upstreamInfo.protocol === "openai") {
-      const message = json.choices?.[0]?.message;
-      responseText = message?.content || "";
-    } else {
-      const content = json.content;
-      if (Array.isArray(content)) {
-        const textBlocks = content.filter((block: any) => block.type === "text");
-        responseText = textBlocks.map((block: any) => block.text).join("\n");
-      }
-    }
-
-    log("info", `🤖 AI response for deep browse links`, {
-      requestId,
-      requestedCount: count,
-      responseLength: responseText.length,
-      responsePreview: responseText.substring(0, 500),
-    });
-
-    // 提取链接
-    const links = this.extractDeepBrowseLinks(responseText);
-
-    log("info", `🔗 Got deep browse links`, {
-      requestId,
-      requestedCount: count,
-      extractedCount: links.length,
-      links: links.map(l => l.substring(0, 100)),
-    });
-
-    return links;
   }
 
   /**
@@ -1275,13 +1041,7 @@ https://example.com/page3
   ): Promise<void> {
     const prompt = `Based on the following search results for the query "${query}", please provide a comprehensive analysis and answer:\n\n${searchSummary}\n\nProvide a detailed, well-structured response that synthesizes the information from these search results.`;
 
-    const analysisMessages: ClaudeMessage[] = [
-      ...messages,
-      {
-        role: "user",
-        content: prompt,
-      },
-    ];
+    const analysisMessages = ContextBuilder.appendUserMessage(messages, prompt);
 
     await this.streamFromUpstream(analysisMessages, upstreamInfo, requestId, onStreamChunk);
   }
@@ -1296,13 +1056,7 @@ https://example.com/page3
     requestId: string,
     onStreamChunk: (text: string) => Promise<void>,
   ): Promise<void> {
-    const analysisMessages: ClaudeMessage[] = [
-      ...messages,
-      {
-        role: "user",
-        content: finalPrompt,
-      },
-    ];
+    const analysisMessages = ContextBuilder.appendUserMessage(messages, finalPrompt);
 
     await this.streamFromUpstream(analysisMessages, upstreamInfo, requestId, onStreamChunk);
   }
@@ -1316,106 +1070,21 @@ https://example.com/page3
     requestId: string,
     onStreamChunk: (text: string) => Promise<void>,
   ): Promise<void> {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+    // 使用 AIClient 进行流式请求
+    const context = this.createContextFromUpstreamInfo(upstreamInfo, requestId);
+    const client = new AIClient(context);
 
-    let fetchBody: string;
-    const finalUrl = upstreamInfo.baseUrl;
-
-    if (upstreamInfo.protocol === "openai") {
-      const openaiMessages = messages.map((msg) => ({
-        role: msg.role,
-        content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content),
-      }));
-
-      fetchBody = JSON.stringify({
-        model: upstreamInfo.model,
-        messages: openaiMessages,
-        stream: true,
+    await client.streamRequest(
+      messages,
+      {
         max_tokens: 4096,
-      });
-
-      if (upstreamInfo.apiKey) {
-        headers["Authorization"] = `Bearer ${upstreamInfo.apiKey}`;
-      }
-    } else {
-      fetchBody = JSON.stringify({
-        model: upstreamInfo.model,
-        messages: messages,
-        stream: true,
-        max_tokens: 4096,
-      });
-
-      if (upstreamInfo.apiKey) {
-        headers["x-api-key"] = upstreamInfo.apiKey;
-      }
-      headers["anthropic-version"] = "2023-06-01";
-    }
-
-    const response = await fetch(finalUrl, {
-      method: "POST",
-      headers,
-      body: fetchBody,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      log("error", `Upstream streaming failed (${response.status})`, {
-        requestId,
-        error: errorText.slice(0, 200),
-      });
-      throw new Error(`Upstream streaming failed: ${response.status}`);
-    }
-
-    if (!response.body) {
-      throw new Error("No response body");
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.trim() || line.startsWith(":")) continue;
-
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            if (data === "[DONE]") continue;
-
-            try {
-              const json = JSON.parse(data);
-
-              if (upstreamInfo.protocol === "openai") {
-                // OpenAI 格式
-                const delta = json.choices?.[0]?.delta;
-                if (delta?.content) {
-                  await onStreamChunk(delta.content);
-                }
-              } else {
-                // Anthropic 格式
-                if (json.type === "content_block_delta" && json.delta?.type === "text_delta") {
-                  await onStreamChunk(json.delta.text);
-                }
-              }
-            } catch (e) {
-              // 忽略解析错误
-            }
-          }
+      },
+      async (chunk) => {
+        if (chunk.text) {
+          await onStreamChunk(chunk.text);
         }
-      }
-    } finally {
-      reader.releaseLock();
-    }
+      },
+    );
   }
 }
 
