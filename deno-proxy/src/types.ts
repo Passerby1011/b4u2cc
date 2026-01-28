@@ -48,7 +48,7 @@ export interface ClaudeRequest {
   model: string;
   max_tokens: number;
   messages: ClaudeMessage[];
-  system?: string | ClaudeContentBlock[];
+  system?: ClaudeContentBlock[];
   stream?: boolean;
   temperature?: number;
   top_p?: number;

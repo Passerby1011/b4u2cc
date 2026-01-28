@@ -230,14 +230,12 @@ export function enrichClaudeRequest(request: ClaudeRequest): EnrichedClaudeReque
     template = template.replaceAll(`{${key}}`, String(value));
   }
 
-  // 1. 处理 System Prompt
+  // 1. 处理 System Prompt（现在 system 统一为数组格式）
   let systemContent = "";
   if (request.system) {
-    if (typeof request.system === "string") {
-      systemContent = request.system;
-    } else {
-      systemContent = request.system.map(b => b.type === "text" ? b.text : "").join("\n");
-    }
+    systemContent = request.system
+      .map((b) => b.type === "text" ? b.text : "")
+      .join("\n");
   }
   const enrichedSystem = `${template}\n\n${systemContent}`.trim();
 
@@ -248,9 +246,10 @@ export function enrichClaudeRequest(request: ClaudeRequest): EnrichedClaudeReque
   }));
 
   // 3. 构造新请求（清空 tools，注入 system）
+  // 保持 system 为数组格式以兼容上游 API
   const enrichedRequest: ClaudeRequest = {
     ...request,
-    system: enrichedSystem,
+    system: [{ type: "text" as const, text: enrichedSystem }],
     messages: enrichedMessages,
     tools: undefined, // 清空上游工具定义，因为我们要模拟
   };

@@ -19,6 +19,16 @@ const getConfig = () => adminService.getCurrentConfig();
 
 const rateLimiter = new RateLimiter(getConfig().maxRequestsPerMinute, 60_000);
 
+/**
+ * 规范化 ClaudeRequest 中的 system 字段：
+ * 将字符串格式转换为数组格式，确保与上游 API 兼容
+ */
+function normalizeSystem(req: ClaudeRequest): void {
+  if (req.system && typeof req.system === "string") {
+    req.system = [{ type: "text" as const, text: req.system }];
+  }
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -65,6 +75,8 @@ async function handleMessages(req: Request, requestId: string) {
   try {
     const rawBody = await req.text();
     body = JSON.parse(rawBody);
+    // 规范化 system 字段：将字符串转换为数组格式
+    normalizeSystem(body);
 
     await logRequest(requestId, "debug", "Received Claude request body", {
       rawPreview: body,
@@ -572,6 +584,8 @@ async function handleTokenCount(req: Request, requestId: string) {
   try {
     const rawBody = await req.text();
     body = JSON.parse(rawBody);
+    // 规范化 system 字段：将字符串转换为数组格式
+    normalizeSystem(body);
   } catch {
     return jsonResponse({ error: "invalid JSON body" }, 400);
   }
